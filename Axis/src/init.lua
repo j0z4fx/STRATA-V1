@@ -168,31 +168,17 @@ return function(Toolkit, Veil)
 
 		self.TitlebarShell = buildTitlebarShell(self.Titlebar)
 
-		self.TitlebarContent = Veil.Instance:Create("Frame", {
-			Name = "TitlebarContent",
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(14, 11),
-			Size = UDim2.new(1, -28, 0, 18),
-			ZIndex = 4,
-			Parent = self.Titlebar,
-		})
-
-		Veil.Instance:Create("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
-			Padding = UDim.new(0, 4),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			VerticalAlignment = Enum.VerticalAlignment.Center,
-			Parent = self.TitlebarContent,
-		})
+		local titleWidth = math.ceil(measureText(self.Title, 14, Enum.Font.GothamMedium).X)
+		local chipTextBounds = measureText(self.StatusText, 12, Enum.Font.GothamMedium)
+		local chipWidth = math.ceil(chipTextBounds.X) + 4
 
 		self.TitlebarText = Veil.Instance:Create("TextLabel", {
 			Name = "Title",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			LayoutOrder = 1,
-			Size = UDim2.fromOffset(math.ceil(measureText(self.Title, 14, Enum.Font.GothamMedium).X), 18),
+			Position = UDim2.fromOffset(14, 11),
+			Size = UDim2.fromOffset(titleWidth, 18),
 			Text = self.Title,
 			TextColor3 = COLORS.Text,
 			TextSize = 14,
@@ -200,21 +186,18 @@ return function(Toolkit, Veil)
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Center,
 			ZIndex = 5,
-			Parent = self.TitlebarContent,
+			Parent = self.Titlebar,
 		})
-
-		local chipTextBounds = measureText(self.StatusText, 12, Enum.Font.GothamMedium)
-		local chipWidth = math.ceil(chipTextBounds.X) + 4
 
 		self.StatusChip = Veil.Instance:Create("Frame", {
 			Name = "StatusChip",
 			BackgroundColor3 = COLORS.Accent,
 			BackgroundTransparency = 0.84,
 			BorderSizePixel = 0,
-			LayoutOrder = 2,
+			Position = UDim2.fromOffset(14 + titleWidth + 4, 11),
 			Size = UDim2.fromOffset(chipWidth, 18),
 			ZIndex = 5,
-			Parent = self.TitlebarContent,
+			Parent = self.Titlebar,
 		})
 
 		createCorner(self.StatusChip, 4)
