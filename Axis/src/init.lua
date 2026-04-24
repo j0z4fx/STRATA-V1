@@ -173,7 +173,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Size = UDim2.new(1, 0, 0, 40),
 			ZIndex = 2,
-			Parent = self.Frame,
+			Parent = self.WindowBackground,
 		})
 
 		self.TitlebarShell = buildTitlebarShell(self.Titlebar)
@@ -229,7 +229,7 @@ return function(Toolkit, Veil)
 			Position = UDim2.fromOffset(0, 40),
 			Size = UDim2.new(1, 0, 1, -40),
 			ZIndex = 2,
-			Parent = self.Frame,
+			Parent = self.WindowBackground,
 		})
 
 		self.Sidebar = Veil.Instance:Create("Frame", {
