@@ -2077,9 +2077,12 @@ return function(Toolkit, Veil)
 		local width = DropdownPanelWidth
 		local anchorPos = holder.AbsolutePosition
 		local anchorSize = holder.AbsoluteSize
-		local belowY = anchorPos.Y + anchorSize.Y + DropdownPanelGap
-		local aboveY = anchorPos.Y - panelHeight - DropdownPanelGap
-		local nextX = anchorPos.X + anchorSize.X - width
+		local surfaceOffset = Axis.PickerSurface and Axis.PickerSurface.AbsolutePosition or Vector2.zero
+		local relX = anchorPos.X - surfaceOffset.X
+		local relY = anchorPos.Y - surfaceOffset.Y
+		local belowY = relY + anchorSize.Y + DropdownPanelGap
+		local aboveY = relY - panelHeight - DropdownPanelGap
+		local nextX = relX + anchorSize.X - width
 		nextX = math.clamp(nextX, 10, math.max(10, viewportSize.X - width - 10))
 		local nextY
 		if belowY + panelHeight <= viewportSize.Y - 10 then
@@ -3441,14 +3444,15 @@ return function(Toolkit, Veil)
 			if self.Disabled then return end
 			Axis:_closeActivePicker(self.Panel)
 			Axis.ActivePickerPopup = self.Panel
-			local h = computePanelHeight()
-			self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
+			self.Panel.Position = UDim2.fromOffset(-4000, -4000)
 			self.Panel.Visible = true
 			self.Panel:SetAttribute("AxisOpen", true)
 			if Axis.PickerBackdrop then
 				Axis.PickerBackdrop.Visible = true
 			end
-			task.defer(function()
+			local h = computePanelHeight()
+			task.spawn(function()
+				task.wait()
 				if self.Panel and self.Panel.Visible then
 					self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
 				end
