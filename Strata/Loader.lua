@@ -1,6 +1,11 @@
-local TOOLKIT_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main/Toolkit/src/init.lua"
-local VEIL_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main/Veil/src/init.lua"
-local AXIS_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main/Axis/src/init.lua"
+local DEV = true
+local RAW_BASE_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main"
+local CDN_BASE_URL = "https://cdn.jsdelivr.net/gh/j0z4fx/STRATA-V1@main"
+local BASE_URL = DEV and RAW_BASE_URL or CDN_BASE_URL
+
+local TOOLKIT_URL = BASE_URL .. "/Toolkit/src/init.lua"
+local VEIL_URL = BASE_URL .. "/Veil/src/init.lua"
+local AXIS_URL = BASE_URL .. "/Axis/src/init.lua"
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -10,6 +15,14 @@ local TextColor = Color3.fromRGB(238, 238, 242)
 local SurfaceColor = Color3.fromRGB(19, 19, 22)
 local BarTrackColor = Color3.fromRGB(24, 24, 27)
 local TotalFakeDelay = 1.5
+
+local function Fetch(url)
+	if DEV then
+		return game:HttpGet(url .. "?v=" .. tostring(os.time()))
+	end
+
+	return game:HttpGet(url)
+end
 
 local function getLoaderParent()
 	local player = Players.LocalPlayer
@@ -164,7 +177,7 @@ local steps = {
 		Text = "Loading Toolkit...",
 		Error = "[Strata Loader] Failed to load Toolkit",
 		Run = function()
-			context.Toolkit = loadstring(game:HttpGet(TOOLKIT_URL))()
+			context.Toolkit = loadstring(Fetch(TOOLKIT_URL))()
 		end,
 	},
 	{
@@ -180,7 +193,8 @@ local steps = {
 		Text = "Loading Veil...",
 		Error = "[Strata Loader] Failed to load Veil",
 		Run = function()
-			context.Veil = loadstring(game:HttpGet(VEIL_URL))()(context.Toolkit)
+			local veilFactory = loadstring(Fetch(VEIL_URL))()
+			context.Veil = veilFactory(context.Toolkit)
 		end,
 	},
 	{
@@ -199,7 +213,8 @@ local steps = {
 		Text = "Loading Axis...",
 		Error = "[Strata Loader] Failed to load Axis",
 		Run = function()
-			context.Axis = loadstring(game:HttpGet(AXIS_URL))()(context.Toolkit, context.Veil)
+			local axisFactory = loadstring(Fetch(AXIS_URL))()
+			context.Axis = axisFactory(context.Toolkit, context.Veil)
 
 			if context.Axis and context.Axis.Surface and context.Axis.Surface:IsA("ScreenGui") then
 				context.Axis.Surface.Enabled = false
