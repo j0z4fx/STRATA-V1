@@ -46,8 +46,8 @@ return function(Toolkit, Veil)
 	local ColumnPaddingX = 14
 	local ColumnPaddingY = 14
 	local ColumnItemSpacing = 10
-	local LabelRowHeight = 18
-	local LabelRowWithSubtextHeight = 38
+	local LabelRowHeight = 28
+	local LabelRowWithSubtextHeight = 46
 	local DividerInsetX = 6
 	local SectionHeaderGap = 10
 	local ToggleRowHeight = 30
@@ -75,6 +75,15 @@ return function(Toolkit, Veil)
 	local KeypickerModeMenuWidth = 86
 	local KeypickerModeRowHeight = 22
 	local DividerSnapThresholdScale = 0.02
+	local SliderRowHeight = 38
+	local SliderRowWithSubtextHeight = 54
+	local SliderNotchedRowHeight = 46
+	local SliderNotchedRowWithSubtextHeight = 62
+	local SliderTrackHeight = 4
+	local SliderThumbDiameter = 14
+	local SliderValueWidth = 38
+	local SliderLerpAlpha = 0.22
+	local SliderDragLerpAlpha = 0.42
 	local Lucide
 
 	local function loadLucide()
@@ -262,6 +271,25 @@ return function(Toolkit, Veil)
 		end
 
 		return success, result
+	end
+
+	local function snapToStep(value, min, max, step)
+		if not step or step <= 0 then
+			return math.clamp(value, min, max)
+		end
+		local stepped = min + math.round((value - min) / step) * step
+		return math.clamp(stepped, min, max)
+	end
+
+	local function formatSliderValue(value, step)
+		if not step or step <= 0 then
+			return string.format("%.2f", value)
+		end
+		if step >= 1 and step == math.floor(step) then
+			return tostring(math.floor(value + 0.5))
+		end
+		local decimals = math.max(0, math.ceil(-math.log10(step + 1e-9)))
+		return string.format("%." .. decimals .. "f", value)
 	end
 
 	local function setOverlayVisualState(card, isVisible)
@@ -1334,6 +1362,7 @@ return function(Toolkit, Veil)
 			ZIndex = 2,
 			Parent = self.Content,
 		})
+		createCorner(self.TabContentHost, 14)
 
 		self.Cursor = Veil.Instance:Create("Frame", {
 			Name = "CrossCursor",
@@ -1747,6 +1776,21 @@ return function(Toolkit, Veil)
 					elementOptions.ColumnFrame = columnApi.Frame
 					return columnApi.Window:_createToggle(columnApi.Tab, elementOptions)
 				end,
+				Slider = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createSlider(columnApi.Tab, elementOptions)
+				end,
+				NotchedSlider = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createNotchedSlider(columnApi.Tab, elementOptions)
+				end,
+				RangeSlider = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createRangeSlider(columnApi.Tab, elementOptions)
+				end,
 			}
 		end
 
@@ -1771,6 +1815,15 @@ return function(Toolkit, Veil)
 		function tab:SectionHeader(textOrOptions)
 			local elementOptions = type(textOrOptions) == "table" and textOrOptions or { Text = textOrOptions }
 			return self.Window:_createSectionHeader(self, elementOptions)
+		end
+		function tab:Slider(elementOptions)
+			return self.Window:_createSlider(self, elementOptions)
+		end
+		function tab:NotchedSlider(elementOptions)
+			return self.Window:_createNotchedSlider(self, elementOptions)
+		end
+		function tab:RangeSlider(elementOptions)
+			return self.Window:_createRangeSlider(self, elementOptions)
 		end
 
 		tab.Button.MouseButton1Click:Connect(function()
@@ -1816,7 +1869,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = hasSubtext and UDim2.fromOffset(0, 0) or UDim2.new(0, 0, 0.5, 0),
+			Position = hasSubtext and UDim2.fromOffset(0, 6) or UDim2.new(0, 0, 0.5, 0),
 			Size = UDim2.new(1, 0, 0, 18),
 			Text = label.Text,
 			TextColor3 = COLORS.Text,
@@ -1834,7 +1887,7 @@ return function(Toolkit, Veil)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Font = Enum.Font.Gotham,
-				Position = UDim2.fromOffset(0, 18),
+				Position = UDim2.fromOffset(0, 24),
 				Size = UDim2.new(1, 0, 0, 16),
 				Text = label.Subtext,
 				TextColor3 = COLORS.Text,
@@ -3025,6 +3078,810 @@ return function(Toolkit, Veil)
 
 		table.insert(tab.ToggleControls, toggle)
 		return toggle
+	end
+
+	-- ── Slider shared internals ──────────────────────────────────────────────
+
+	local function buildSliderTrack(holder, trackZoneTop, thumbRadius, trackInsetY)
+		local trackZone = Veil.Instance:Create("Frame", {
+			Name = "TrackZone",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(0, trackZoneTop),
+			Size = UDim2.new(1, 0, 0, SliderThumbDiameter),
+			ZIndex = 5,
+			Parent = holder,
+		})
+
+		local trackBg = Veil.Instance:Create("Frame", {
+			Name = "TrackBg",
+			BackgroundColor3 = COLORS.ToggleOffBackground,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(thumbRadius, trackInsetY),
+			Size = UDim2.new(1, -SliderThumbDiameter, 0, SliderTrackHeight),
+			ZIndex = 5,
+			Parent = trackZone,
+		})
+		createCorner(trackBg, SliderTrackHeight / 2)
+
+		local trackFill = Veil.Instance:Create("Frame", {
+			Name = "TrackFill",
+			BackgroundColor3 = COLORS.Accent,
+			BorderSizePixel = 0,
+			Size = UDim2.new(0, 0, 1, 0),
+			ZIndex = 6,
+			Parent = trackBg,
+		})
+		createCorner(trackFill, SliderTrackHeight / 2)
+
+		local thumb = Veil.Instance:Create("Frame", {
+			Name = "Thumb",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = COLORS.Accent,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(thumbRadius, SliderThumbDiameter / 2),
+			Size = UDim2.fromOffset(SliderThumbDiameter, SliderThumbDiameter),
+			ZIndex = 7,
+			Parent = trackZone,
+		})
+		createCorner(thumb, SliderThumbDiameter / 2)
+
+		local hitbox = Veil.Instance:Create("TextButton", {
+			Name = "Hitbox",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			Text = "",
+			ZIndex = 8,
+			Parent = trackZone,
+		})
+
+		return trackZone, trackBg, trackFill, thumb, hitbox
+	end
+
+	local function buildSliderTextRows(holder, name, subtext, hasSubtext)
+		local title = Veil.Instance:Create("TextLabel", {
+			Name = "Title",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.fromOffset(0, 0),
+			Size = UDim2.new(1, -SliderValueWidth, 0, 18),
+			Text = name,
+			TextColor3 = COLORS.Text,
+			TextSize = 14,
+			TextTransparency = 0,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 5,
+			Parent = holder,
+		})
+
+		local valueLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Value",
+			AnchorPoint = Vector2.new(1, 0),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.new(1, 0, 0, 0),
+			Size = UDim2.fromOffset(SliderValueWidth, 18),
+			Text = "",
+			TextColor3 = COLORS.Text,
+			TextSize = 12,
+			TextTransparency = 0.25,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 5,
+			Parent = holder,
+		})
+
+		local subtextLabel = nil
+		if hasSubtext then
+			subtextLabel = Veil.Instance:Create("TextLabel", {
+				Name = "Subtext",
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Font = Enum.Font.Gotham,
+				Position = UDim2.fromOffset(0, 18),
+				Size = UDim2.new(1, 0, 0, 16),
+				Text = subtext,
+				TextColor3 = COLORS.Text,
+				TextSize = 12,
+				TextTransparency = 0.35,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				ZIndex = 5,
+				Parent = holder,
+			})
+		end
+
+		return title, valueLabel, subtextLabel
+	end
+
+	-- ── Normal Slider ────────────────────────────────────────────────────────
+
+	function Window:_createSlider(tab, options)
+		options = options or {}
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local subtext = options.Subtext or options.Description or options.Desc
+		local hasSubtext = type(subtext) == "string" and subtext ~= ""
+		local min = tonumber(options.Min) or 0
+		local max = tonumber(options.Max) or 100
+		if min > max then min, max = max, min end
+		local step = tonumber(options.Step)
+		local default = snapToStep(tonumber(options.Default) or min, min, max, step)
+		local rowHeight = hasSubtext and SliderRowWithSubtextHeight or SliderRowHeight
+		local thumbRadius = SliderThumbDiameter / 2
+		local trackZoneTop = hasSubtext and 38 or 22
+		local trackInsetY = (SliderThumbDiameter - SliderTrackHeight) / 2
+
+		local slider = {
+			Type = "Slider",
+			Name = options.Name or options.Text or "Slider",
+			Min = min,
+			Max = max,
+			Step = step,
+			Value = default,
+			TargetFraction = (max > min) and (default - min) / (max - min) or 0,
+			VisualFraction = (max > min) and (default - min) / (max - min) or 0,
+			IsDragging = false,
+			Disabled = options.Disabled == true,
+			Callback = options.Callback,
+			ChangedSignal = Toolkit.Signal.new(),
+			Tab = tab,
+			Window = self,
+		}
+
+		slider.Holder = createTextRow(parentColumn, slider.Name, rowHeight)
+		slider.Holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+
+		slider.TitleLabel, slider.ValueLabel, slider.SubtextLabel =
+			buildSliderTextRows(slider.Holder, slider.Name, subtext, hasSubtext)
+
+		slider.TrackZone, slider.TrackBg, slider.TrackFill, slider.Thumb, slider.Hitbox =
+			buildSliderTrack(slider.Holder, trackZoneTop, thumbRadius, trackInsetY)
+
+		function slider:_refreshTrack()
+			local f = self.VisualFraction
+			local trackW = self.TrackBg.AbsoluteSize.X
+			self.TrackFill.Size = UDim2.new(f, 0, 1, 0)
+			self.Thumb.Position = UDim2.fromOffset(thumbRadius + f * trackW, SliderThumbDiameter / 2)
+
+			local disabled = self.Disabled
+			self.TitleLabel.TextTransparency = disabled and 0.5 or 0
+			if self.SubtextLabel then
+				self.SubtextLabel.TextTransparency = disabled and 0.6 or 0.35
+			end
+			self.ValueLabel.TextTransparency = disabled and 0.6 or 0.25
+			local blockT = disabled and 0.45 or 0
+			self.TrackFill.BackgroundTransparency = blockT
+			self.Thumb.BackgroundTransparency = blockT
+			self.TrackBg.BackgroundTransparency = disabled and 0.4 or 0
+		end
+
+		function slider:_updateFromInput(inputPosition)
+			local trackPos = self.TrackBg.AbsolutePosition
+			local trackW = self.TrackBg.AbsoluteSize.X
+			if trackW <= 0 then return end
+			local f = math.clamp((inputPosition.X - trackPos.X) / trackW, 0, 1)
+			local raw = self.Min + f * (self.Max - self.Min)
+			local snapped = snapToStep(raw, self.Min, self.Max, self.Step)
+			local snappedF = (snapped - self.Min) / math.max(1e-9, self.Max - self.Min)
+			self.TargetFraction = snappedF
+			if snapped ~= self.Value then
+				self.Value = snapped
+				self.ValueLabel.Text = formatSliderValue(snapped, self.Step)
+				safeCallback(self.Callback, snapped)
+				self.ChangedSignal:Fire(snapped)
+			end
+		end
+
+		function slider:Set(value, setOptions)
+			setOptions = setOptions or {}
+			local snapped = snapToStep(tonumber(value) or self.Min, self.Min, self.Max, self.Step)
+			local changed = snapped ~= self.Value
+			self.Value = snapped
+			self.TargetFraction = (snapped - self.Min) / math.max(1e-9, self.Max - self.Min)
+			self.ValueLabel.Text = formatSliderValue(snapped, self.Step)
+			if setOptions.Instant then
+				self.VisualFraction = self.TargetFraction
+				self:_refreshTrack()
+			end
+			if changed and not setOptions.Silent then
+				safeCallback(self.Callback, snapped)
+				self.ChangedSignal:Fire(snapped)
+			end
+			return snapped
+		end
+		slider.SetValue = slider.Set
+
+		function slider:GetValue()
+			return self.Value
+		end
+
+		function slider:SetDisabled(disabled)
+			self.Disabled = disabled == true
+			self.Hitbox.Active = not self.Disabled
+			self:_refreshTrack()
+		end
+
+		function slider:OnChanged(callback)
+			local conn = self.ChangedSignal:Connect(callback)
+			safeCallback(callback, self.Value)
+			return conn
+		end
+
+		local dragging = false
+
+		slider.Hitbox.InputBegan:Connect(function(input)
+			if slider.Disabled then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
+			dragging = true
+			slider.IsDragging = true
+			slider:_updateFromInput(input.Position)
+		end)
+
+		registerCleanup(self, UserInputService.InputChanged:Connect(function(input)
+			if not dragging then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
+			slider:_updateFromInput(input.Position)
+		end))
+
+		registerCleanup(self, UserInputService.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				dragging = false
+				slider.IsDragging = false
+			end
+		end))
+
+		registerCleanup(self, RunService.Heartbeat:Connect(function()
+			if math.abs(slider.TargetFraction - slider.VisualFraction) < 0.0005 then
+				if slider.VisualFraction ~= slider.TargetFraction then
+					slider.VisualFraction = slider.TargetFraction
+					slider:_refreshTrack()
+				end
+				return
+			end
+			local alpha = slider.IsDragging and SliderDragLerpAlpha or SliderLerpAlpha
+			slider.VisualFraction = slider.VisualFraction + (slider.TargetFraction - slider.VisualFraction) * alpha
+			slider:_refreshTrack()
+		end))
+
+		slider:Set(default, { Instant = true, Silent = true })
+		task.defer(function()
+			slider.VisualFraction = slider.TargetFraction
+			slider:_refreshTrack()
+		end)
+
+		return slider
+	end
+
+	-- ── Notched Slider ───────────────────────────────────────────────────────
+
+	function Window:_createNotchedSlider(tab, options)
+		options = options or {}
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local subtext = options.Subtext or options.Description or options.Desc
+		local hasSubtext = type(subtext) == "string" and subtext ~= ""
+		local min = tonumber(options.Min) or 0
+		local max = tonumber(options.Max) or 10
+		if min > max then min, max = max, min end
+		local step = math.max(1e-9, tonumber(options.Step) or 1)
+		local default = snapToStep(tonumber(options.Default) or min, min, max, step)
+		local rowHeight = hasSubtext and SliderNotchedRowWithSubtextHeight or SliderNotchedRowHeight
+		local thumbRadius = SliderThumbDiameter / 2
+		local trackZoneTop = hasSubtext and 38 or 22
+		local trackInsetY = (SliderThumbDiameter - SliderTrackHeight) / 2
+
+		local slider = {
+			Type = "NotchedSlider",
+			Name = options.Name or options.Text or "Slider",
+			Min = min,
+			Max = max,
+			Step = step,
+			Value = default,
+			TargetFraction = (max > min) and (default - min) / (max - min) or 0,
+			VisualFraction = (max > min) and (default - min) / (max - min) or 0,
+			IsDragging = false,
+			Disabled = options.Disabled == true,
+			Callback = options.Callback,
+			ChangedSignal = Toolkit.Signal.new(),
+			Tab = tab,
+			Window = self,
+		}
+
+		slider.Holder = createTextRow(parentColumn, slider.Name, rowHeight)
+		slider.Holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+
+		slider.TitleLabel, slider.ValueLabel, slider.SubtextLabel =
+			buildSliderTextRows(slider.Holder, slider.Name, subtext, hasSubtext)
+
+		slider.TrackZone, slider.TrackBg, slider.TrackFill, slider.Thumb, slider.Hitbox =
+			buildSliderTrack(slider.Holder, trackZoneTop, thumbRadius, trackInsetY)
+
+		-- Build notch marks below the track zone
+		local notchCount = math.floor((max - min) / step + 0.5) + 1
+		local notchZone = Veil.Instance:Create("Frame", {
+			Name = "NotchZone",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(thumbRadius, trackZoneTop + SliderThumbDiameter + 2),
+			Size = UDim2.new(1, -SliderThumbDiameter, 0, 4),
+			ZIndex = 5,
+			Parent = slider.Holder,
+		})
+
+		for i = 0, notchCount - 1 do
+			local f = (max > min) and (i * step) / (max - min) or 0
+			f = math.clamp(f, 0, 1)
+			Veil.Instance:Create("Frame", {
+				Name = "Notch" .. i,
+				AnchorPoint = Vector2.new(0.5, 0),
+				BackgroundColor3 = COLORS.Text,
+				BackgroundTransparency = 0.72,
+				BorderSizePixel = 0,
+				Position = UDim2.new(f, 0, 0, 0),
+				Size = UDim2.fromOffset(2, 4),
+				ZIndex = 5,
+				Parent = notchZone,
+			})
+		end
+
+		function slider:_refreshTrack()
+			local f = self.VisualFraction
+			local trackW = self.TrackBg.AbsoluteSize.X
+			self.TrackFill.Size = UDim2.new(f, 0, 1, 0)
+			self.Thumb.Position = UDim2.fromOffset(thumbRadius + f * trackW, SliderThumbDiameter / 2)
+
+			local disabled = self.Disabled
+			self.TitleLabel.TextTransparency = disabled and 0.5 or 0
+			if self.SubtextLabel then
+				self.SubtextLabel.TextTransparency = disabled and 0.6 or 0.35
+			end
+			self.ValueLabel.TextTransparency = disabled and 0.6 or 0.25
+			local blockT = disabled and 0.45 or 0
+			self.TrackFill.BackgroundTransparency = blockT
+			self.Thumb.BackgroundTransparency = blockT
+			self.TrackBg.BackgroundTransparency = disabled and 0.4 or 0
+		end
+
+		function slider:_updateFromInput(inputPosition)
+			local trackPos = self.TrackBg.AbsolutePosition
+			local trackW = self.TrackBg.AbsoluteSize.X
+			if trackW <= 0 then return end
+			local f = math.clamp((inputPosition.X - trackPos.X) / trackW, 0, 1)
+			local raw = self.Min + f * (self.Max - self.Min)
+			local snapped = snapToStep(raw, self.Min, self.Max, self.Step)
+			local snappedF = (snapped - self.Min) / math.max(1e-9, self.Max - self.Min)
+			self.TargetFraction = snappedF
+			if snapped ~= self.Value then
+				self.Value = snapped
+				self.ValueLabel.Text = formatSliderValue(snapped, self.Step)
+				safeCallback(self.Callback, snapped)
+				self.ChangedSignal:Fire(snapped)
+			end
+		end
+
+		function slider:Set(value, setOptions)
+			setOptions = setOptions or {}
+			local snapped = snapToStep(tonumber(value) or self.Min, self.Min, self.Max, self.Step)
+			local changed = snapped ~= self.Value
+			self.Value = snapped
+			self.TargetFraction = (snapped - self.Min) / math.max(1e-9, self.Max - self.Min)
+			self.ValueLabel.Text = formatSliderValue(snapped, self.Step)
+			if setOptions.Instant then
+				self.VisualFraction = self.TargetFraction
+				self:_refreshTrack()
+			end
+			if changed and not setOptions.Silent then
+				safeCallback(self.Callback, snapped)
+				self.ChangedSignal:Fire(snapped)
+			end
+			return snapped
+		end
+		slider.SetValue = slider.Set
+
+		function slider:GetValue() return self.Value end
+
+		function slider:SetDisabled(disabled)
+			self.Disabled = disabled == true
+			self.Hitbox.Active = not self.Disabled
+			self:_refreshTrack()
+		end
+
+		function slider:OnChanged(callback)
+			local conn = self.ChangedSignal:Connect(callback)
+			safeCallback(callback, self.Value)
+			return conn
+		end
+
+		local dragging = false
+
+		slider.Hitbox.InputBegan:Connect(function(input)
+			if slider.Disabled then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+			dragging = true
+			slider.IsDragging = true
+			slider:_updateFromInput(input.Position)
+		end)
+
+		registerCleanup(self, UserInputService.InputChanged:Connect(function(input)
+			if not dragging then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+			slider:_updateFromInput(input.Position)
+		end))
+
+		registerCleanup(self, UserInputService.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				dragging = false
+				slider.IsDragging = false
+			end
+		end))
+
+		registerCleanup(self, RunService.Heartbeat:Connect(function()
+			if math.abs(slider.TargetFraction - slider.VisualFraction) < 0.0005 then
+				if slider.VisualFraction ~= slider.TargetFraction then
+					slider.VisualFraction = slider.TargetFraction
+					slider:_refreshTrack()
+				end
+				return
+			end
+			local alpha = slider.IsDragging and SliderDragLerpAlpha or SliderLerpAlpha
+			slider.VisualFraction = slider.VisualFraction + (slider.TargetFraction - slider.VisualFraction) * alpha
+			slider:_refreshTrack()
+		end))
+
+		slider:Set(default, { Instant = true, Silent = true })
+		task.defer(function()
+			slider.VisualFraction = slider.TargetFraction
+			slider:_refreshTrack()
+		end)
+
+		return slider
+	end
+
+	-- ── Range Slider ─────────────────────────────────────────────────────────
+
+	function Window:_createRangeSlider(tab, options)
+		options = options or {}
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local subtext = options.Subtext or options.Description or options.Desc
+		local hasSubtext = type(subtext) == "string" and subtext ~= ""
+		local min = tonumber(options.Min) or 0
+		local max = tonumber(options.Max) or 100
+		if min > max then min, max = max, min end
+		local step = tonumber(options.Step)
+		local defaultLow = snapToStep(tonumber(options.DefaultMin) or tonumber(options.Default) or min, min, max, step)
+		local defaultHigh = snapToStep(tonumber(options.DefaultMax) or max, min, max, step)
+		if defaultLow > defaultHigh then defaultLow, defaultHigh = defaultHigh, defaultLow end
+		local rowHeight = hasSubtext and SliderRowWithSubtextHeight or SliderRowHeight
+		local thumbRadius = SliderThumbDiameter / 2
+		local trackZoneTop = hasSubtext and 38 or 22
+		local trackInsetY = (SliderThumbDiameter - SliderTrackHeight) / 2
+
+		local function toFrac(v) return (v - min) / math.max(1e-9, max - min) end
+
+		local slider = {
+			Type = "RangeSlider",
+			Name = options.Name or options.Text or "Range",
+			Min = min,
+			Max = max,
+			Step = step,
+			LowValue = defaultLow,
+			HighValue = defaultHigh,
+			LowTarget = toFrac(defaultLow),
+			HighTarget = toFrac(defaultHigh),
+			LowVisual = toFrac(defaultLow),
+			HighVisual = toFrac(defaultHigh),
+			ActiveThumb = nil,
+			Disabled = options.Disabled == true,
+			Callback = options.Callback,
+			ChangedSignal = Toolkit.Signal.new(),
+			Tab = tab,
+			Window = self,
+		}
+
+		slider.Holder = createTextRow(parentColumn, slider.Name, rowHeight)
+		slider.Holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+
+		slider.TitleLabel, slider.ValueLabel, slider.SubtextLabel =
+			buildSliderTextRows(slider.Holder, slider.Name, subtext, hasSubtext)
+
+		-- Track zone (no single thumb from buildSliderTrack — build manually for two thumbs)
+		slider.TrackZone = Veil.Instance:Create("Frame", {
+			Name = "TrackZone",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(0, trackZoneTop),
+			Size = UDim2.new(1, 0, 0, SliderThumbDiameter),
+			ZIndex = 5,
+			Parent = slider.Holder,
+		})
+
+		slider.TrackBg = Veil.Instance:Create("Frame", {
+			Name = "TrackBg",
+			BackgroundColor3 = COLORS.ToggleOffBackground,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(thumbRadius, trackInsetY),
+			Size = UDim2.new(1, -SliderThumbDiameter, 0, SliderTrackHeight),
+			ZIndex = 5,
+			Parent = slider.TrackZone,
+		})
+		createCorner(slider.TrackBg, SliderTrackHeight / 2)
+
+		slider.RangeFill = Veil.Instance:Create("Frame", {
+			Name = "RangeFill",
+			BackgroundColor3 = COLORS.Accent,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, 0, 0, 0),
+			Size = UDim2.new(1, 0, 1, 0),
+			ZIndex = 6,
+			Parent = slider.TrackBg,
+		})
+
+		slider.LowThumb = Veil.Instance:Create("Frame", {
+			Name = "LowThumb",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = COLORS.Accent,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(thumbRadius, SliderThumbDiameter / 2),
+			Size = UDim2.fromOffset(SliderThumbDiameter, SliderThumbDiameter),
+			ZIndex = 7,
+			Parent = slider.TrackZone,
+		})
+		createCorner(slider.LowThumb, thumbRadius)
+
+		slider.HighThumb = Veil.Instance:Create("Frame", {
+			Name = "HighThumb",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = COLORS.Accent,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(thumbRadius, SliderThumbDiameter / 2),
+			Size = UDim2.fromOffset(SliderThumbDiameter, SliderThumbDiameter),
+			ZIndex = 7,
+			Parent = slider.TrackZone,
+		})
+		createCorner(slider.HighThumb, thumbRadius)
+
+		slider.LowHitbox = Veil.Instance:Create("TextButton", {
+			Name = "LowHitbox",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(SliderThumbDiameter + 8, SliderThumbDiameter),
+			Text = "",
+			ZIndex = 8,
+			Parent = slider.TrackZone,
+		})
+
+		slider.HighHitbox = Veil.Instance:Create("TextButton", {
+			Name = "HighHitbox",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(SliderThumbDiameter + 8, SliderThumbDiameter),
+			Text = "",
+			ZIndex = 8,
+			Parent = slider.TrackZone,
+		})
+
+		-- Full track hitbox for clicking the track itself
+		slider.TrackHitbox = Veil.Instance:Create("TextButton", {
+			Name = "TrackHitbox",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			Text = "",
+			ZIndex = 6,
+			Parent = slider.TrackZone,
+		})
+
+		local function formatRange(lo, hi)
+			local fmtLo = formatSliderValue(lo, step)
+			local fmtHi = formatSliderValue(hi, step)
+			return fmtLo .. " – " .. fmtHi
+		end
+
+		function slider:_refreshTrack()
+			local lo = self.LowVisual
+			local hi = self.HighVisual
+			local trackW = self.TrackBg.AbsoluteSize.X
+
+			local loCenterX = thumbRadius + lo * trackW
+			local hiCenterX = thumbRadius + hi * trackW
+
+			self.LowThumb.Position = UDim2.fromOffset(loCenterX, SliderThumbDiameter / 2)
+			self.HighThumb.Position = UDim2.fromOffset(hiCenterX, SliderThumbDiameter / 2)
+
+			-- Thumb hitbox positions (centered on thumbs, with extra grab zone)
+			self.LowHitbox.Position = UDim2.fromOffset(loCenterX - (SliderThumbDiameter / 2 + 4), 0)
+			self.HighHitbox.Position = UDim2.fromOffset(hiCenterX - (SliderThumbDiameter / 2 + 4), 0)
+
+			-- Range fill: from lo to hi fraction within TrackBg
+			self.RangeFill.Position = UDim2.new(lo, 0, 0, 0)
+			self.RangeFill.Size = UDim2.new(hi - lo, 0, 1, 0)
+
+			local disabled = self.Disabled
+			self.TitleLabel.TextTransparency = disabled and 0.5 or 0
+			if self.SubtextLabel then
+				self.SubtextLabel.TextTransparency = disabled and 0.6 or 0.35
+			end
+			self.ValueLabel.TextTransparency = disabled and 0.6 or 0.25
+			local blockT = disabled and 0.45 or 0
+			self.RangeFill.BackgroundTransparency = blockT
+			self.LowThumb.BackgroundTransparency = blockT
+			self.HighThumb.BackgroundTransparency = blockT
+			self.TrackBg.BackgroundTransparency = disabled and 0.4 or 0
+		end
+
+		local function updateValue(which, inputPosition)
+			local trackPos = slider.TrackBg.AbsolutePosition
+			local trackW = slider.TrackBg.AbsoluteSize.X
+			if trackW <= 0 then return end
+			local f = math.clamp((inputPosition.X - trackPos.X) / trackW, 0, 1)
+			local raw = slider.Min + f * (slider.Max - slider.Min)
+			local snapped = snapToStep(raw, slider.Min, slider.Max, slider.Step)
+			local snappedF = (snapped - slider.Min) / math.max(1e-9, slider.Max - slider.Min)
+
+			if which == "low" then
+				snapped = math.min(snapped, slider.HighValue)
+				snappedF = math.min(snappedF, slider.HighTarget)
+				if snapped ~= slider.LowValue then
+					slider.LowValue = snapped
+					slider.LowTarget = snappedF
+					slider.ValueLabel.Text = formatRange(slider.LowValue, slider.HighValue)
+					safeCallback(slider.Callback, slider.LowValue, slider.HighValue)
+					slider.ChangedSignal:Fire(slider.LowValue, slider.HighValue)
+				end
+			else
+				snapped = math.max(snapped, slider.LowValue)
+				snappedF = math.max(snappedF, slider.LowTarget)
+				if snapped ~= slider.HighValue then
+					slider.HighValue = snapped
+					slider.HighTarget = snappedF
+					slider.ValueLabel.Text = formatRange(slider.LowValue, slider.HighValue)
+					safeCallback(slider.Callback, slider.LowValue, slider.HighValue)
+					slider.ChangedSignal:Fire(slider.LowValue, slider.HighValue)
+				end
+			end
+		end
+
+		function slider:Set(lowValue, highValue, setOptions)
+			setOptions = setOptions or {}
+			local lo = snapToStep(tonumber(lowValue) or self.Min, self.Min, self.Max, self.Step)
+			local hi = snapToStep(tonumber(highValue) or self.Max, self.Min, self.Max, self.Step)
+			if lo > hi then lo, hi = hi, lo end
+			local changedLo = lo ~= self.LowValue
+			local changedHi = hi ~= self.HighValue
+			self.LowValue = lo
+			self.HighValue = hi
+			self.LowTarget = toFrac(lo)
+			self.HighTarget = toFrac(hi)
+			self.ValueLabel.Text = formatRange(lo, hi)
+			if setOptions.Instant then
+				self.LowVisual = self.LowTarget
+				self.HighVisual = self.HighTarget
+				self:_refreshTrack()
+			end
+			if (changedLo or changedHi) and not setOptions.Silent then
+				safeCallback(self.Callback, lo, hi)
+				self.ChangedSignal:Fire(lo, hi)
+			end
+		end
+		slider.SetValue = slider.Set
+
+		function slider:GetValue()
+			return self.LowValue, self.HighValue
+		end
+
+		function slider:SetDisabled(disabled)
+			self.Disabled = disabled == true
+			local active = not self.Disabled
+			self.LowHitbox.Active = active
+			self.HighHitbox.Active = active
+			self.TrackHitbox.Active = active
+			self:_refreshTrack()
+		end
+
+		function slider:OnChanged(callback)
+			local conn = self.ChangedSignal:Connect(callback)
+			safeCallback(callback, self.LowValue, self.HighValue)
+			return conn
+		end
+
+		local activeThumb = nil
+
+		local function pickThumb(inputX)
+			local trackPos = slider.TrackBg.AbsolutePosition
+			local trackW = slider.TrackBg.AbsoluteSize.X
+			if trackW <= 0 then return "low" end
+			local f = math.clamp((inputX - trackPos.X) / trackW, 0, 1)
+			local dLo = math.abs(f - slider.LowTarget)
+			local dHi = math.abs(f - slider.HighTarget)
+			return dLo <= dHi and "low" or "high"
+		end
+
+		slider.LowHitbox.InputBegan:Connect(function(input)
+			if slider.Disabled then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+			activeThumb = "low"
+			slider.ActiveThumb = "low"
+			updateValue("low", input.Position)
+		end)
+
+		slider.HighHitbox.InputBegan:Connect(function(input)
+			if slider.Disabled then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+			activeThumb = "high"
+			slider.ActiveThumb = "high"
+			updateValue("high", input.Position)
+		end)
+
+		slider.TrackHitbox.InputBegan:Connect(function(input)
+			if slider.Disabled then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+			activeThumb = pickThumb(input.Position.X)
+			slider.ActiveThumb = activeThumb
+			updateValue(activeThumb, input.Position)
+		end)
+
+		registerCleanup(self, UserInputService.InputChanged:Connect(function(input)
+			if not activeThumb then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+			updateValue(activeThumb, input.Position)
+		end))
+
+		registerCleanup(self, UserInputService.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				activeThumb = nil
+				slider.ActiveThumb = nil
+			end
+		end))
+
+		registerCleanup(self, RunService.Heartbeat:Connect(function()
+			local isDragging = slider.ActiveThumb ~= nil
+			local alpha = isDragging and SliderDragLerpAlpha or SliderLerpAlpha
+			local dirtyLo = math.abs(slider.LowTarget - slider.LowVisual) >= 0.0005
+			local dirtyHi = math.abs(slider.HighTarget - slider.HighVisual) >= 0.0005
+
+			if dirtyLo then
+				slider.LowVisual = slider.LowVisual + (slider.LowTarget - slider.LowVisual) * alpha
+			else
+				slider.LowVisual = slider.LowTarget
+			end
+			if dirtyHi then
+				slider.HighVisual = slider.HighVisual + (slider.HighTarget - slider.HighVisual) * alpha
+			else
+				slider.HighVisual = slider.HighTarget
+			end
+			if dirtyLo or dirtyHi then
+				slider:_refreshTrack()
+			end
+		end))
+
+		slider:Set(defaultLow, defaultHigh, { Instant = true, Silent = true })
+		task.defer(function()
+			slider.LowVisual = slider.LowTarget
+			slider.HighVisual = slider.HighTarget
+			slider:_refreshTrack()
+		end)
+
+		return slider
 	end
 
 	Axis.Surface = Veil.GUI:CreateRoot("Axis")

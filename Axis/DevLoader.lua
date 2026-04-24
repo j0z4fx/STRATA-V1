@@ -6,10 +6,9 @@ local Toolkit = loadstring(game:HttpGet(TOOLKIT_URL))()
 local Veil = loadstring(game:HttpGet(VEIL_URL))()(Toolkit)
 local Axis = loadstring(game:HttpGet(AXIS_URL))()(Toolkit, Veil)
 
-Axis:CreateWindow({
-})
+local window = Axis:CreateWindow({})
 
-Axis:CreateTab({
+local homeTab = Axis:CreateTab({
 	Name = "Home",
 	Icon = "house",
 })
@@ -24,6 +23,64 @@ Axis:CreateTab({
 	Icon = "settings",
 	IconScale = 0.8,
 	PinnedBottom = true,
+})
+
+-- Demo controls on Home tab left column
+local left = homeTab.Columns.leftColumn
+
+left:CreateToggle({
+	Name = "Example Toggle",
+})
+
+left:CreateToggle({
+	Name = "Example Toggle",
+	Subtext = "With Subtext",
+})
+
+left:Label({ Name = "Example Label" })
+
+left:Label({
+	Name = "Example Label",
+	Subtext = "With Subtext",
+})
+
+left:SectionHeader("Section Header")
+
+left:Slider({
+	Name = "Sensitivity",
+	Min = 0,
+	Max = 100,
+	Default = 50,
+	Step = 1,
+})
+
+left:Slider({
+	Name = "Smoothing",
+	Min = 0,
+	Max = 1,
+	Default = 0.5,
+	Step = 0.05,
+	Subtext = "Camera smoothing amount",
+})
+
+local middle = homeTab.Columns.middleColumn
+
+middle:NotchedSlider({
+	Name = "Quality",
+	Min = 1,
+	Max = 5,
+	Default = 3,
+	Step = 1,
+})
+
+middle:RangeSlider({
+	Name = "Distance Range",
+	Min = 0,
+	Max = 500,
+	DefaultMin = 50,
+	DefaultMax = 250,
+	Step = 5,
+	Subtext = "Minimum and maximum range",
 })
 
 return Axis
