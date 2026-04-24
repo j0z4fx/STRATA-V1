@@ -50,7 +50,7 @@ return function(Toolkit, Veil)
 	local ToggleRowWithSubtextHeight = 52
 	local ToggleSwitchWidth = 34
 	local ToggleSwitchHeight = 20
-	local ToggleDotSize = 16
+	local ToggleDotSize = 15
 	local ToggleAnimationTime = 0.22
 	local ToggleTooltipDelay = 0.8
 	local TooltipOffset = Vector2.new(16, -10)
