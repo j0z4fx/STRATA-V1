@@ -31,7 +31,7 @@ return function(Toolkit, Veil)
 	local ContentDividerHandleWidth = 4
 	local ContentDividerHandleHeight = 28
 	local MinColumnWidth = 150
-	local ResizeSmoothness = 0.12
+	local ResizeSmoothness = 0.08
 	local OverlaySpacing = 10
 	local OverlayAnimationTime = 0.28
 	local OverlayCornerRadius = 12
@@ -54,7 +54,7 @@ return function(Toolkit, Veil)
 	local ToggleRowWithSubtextHeight = 52
 	local ToggleSwitchWidth = 34
 	local ToggleSwitchHeight = 20
-	local ToggleDotSize = 13
+	local ToggleDotSize = 12
 	local ToggleAnimationTime = 0.22
 	local ToggleTooltipDelay = 0.8
 	local TooltipOffset = Vector2.new(16, -10)
@@ -66,7 +66,7 @@ return function(Toolkit, Veil)
 	local KeypickerMinWidth = 28
 	local ColorpickerButtonSize = 20
 	local PickerPopupWidth = 186
-	local PickerPopupHeight = 156
+	local PickerPopupHeight = 188
 	local PickerPadding = 10
 	local PickerMapSize = Vector2.new(122, 122)
 	local PickerHueWidth = 12
@@ -74,7 +74,6 @@ return function(Toolkit, Veil)
 	local PickerCornerRadius = 10
 	local KeypickerModeMenuWidth = 86
 	local KeypickerModeRowHeight = 22
-	local KeypickerModeAffordanceWidth = 10
 	local DividerSnapThresholdScale = 0.02
 	local Lucide
 
@@ -233,6 +232,12 @@ return function(Toolkit, Veil)
 			PaddingLeft = UDim.new(0, left or 0),
 			Parent = parent,
 		})
+	end
+
+	local function getModeMenuHeight(modeCount)
+		local rows = math.max(1, modeCount or 0)
+		local spacing = math.max(0, rows - 1) * 2
+		return (rows * KeypickerModeRowHeight) + spacing + 8
 	end
 
 	local function createBorder(parent)
@@ -1338,15 +1343,15 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Interactable = false,
 			Size = UDim2.fromOffset(13, 13),
-			ZIndex = 101,
+			ZIndex = 500,
 			Parent = self.Surface,
 		})
 
 		local cursorParts = {
-			{ Name = "VerticalStroke", Size = UDim2.fromOffset(3, 13), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 101 },
-			{ Name = "HorizontalStroke", Size = UDim2.fromOffset(13, 3), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 101 },
-			{ Name = "VerticalFill", Size = UDim2.fromOffset(1, 11), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 102 },
-			{ Name = "HorizontalFill", Size = UDim2.fromOffset(11, 1), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 102 },
+			{ Name = "VerticalStroke", Size = UDim2.fromOffset(3, 13), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 500 },
+			{ Name = "HorizontalStroke", Size = UDim2.fromOffset(13, 3), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 500 },
+			{ Name = "VerticalFill", Size = UDim2.fromOffset(1, 11), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 501 },
+			{ Name = "HorizontalFill", Size = UDim2.fromOffset(11, 1), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 501 },
 		}
 
 		for _, part in ipairs(cursorParts) do
@@ -1980,7 +1985,7 @@ return function(Toolkit, Veil)
 
 		local viewportSize = getViewportSize()
 		local resolvedWidth = width or (popup.AbsoluteSize.X > 0 and popup.AbsoluteSize.X or KeypickerModeMenuWidth)
-		local resolvedHeight = height or (popup.AbsoluteSize.Y > 0 and popup.AbsoluteSize.Y or (KeypickerModeRowHeight * 3))
+		local resolvedHeight = height or (popup.AbsoluteSize.Y > 0 and popup.AbsoluteSize.Y or getModeMenuHeight(3))
 		local anchorPosition = anchorButton.AbsolutePosition
 		local anchorSize = anchorButton.AbsoluteSize
 		local nextX = anchorPosition.X + anchorSize.X - resolvedWidth
@@ -2030,7 +2035,7 @@ return function(Toolkit, Veil)
 		}
 
 		local displayText = keypicker.Value
-		local buttonWidth = math.max(KeypickerMinWidth, math.ceil(measureText(displayText, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding + KeypickerModeAffordanceWidth)
+		local buttonWidth = math.max(KeypickerMinWidth, math.ceil(measureText(displayText, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding)
 		keypicker.Button = makeAccessoryButton(host, "Keypicker", buttonWidth)
 		keypicker.Button.Active = true
 		keypicker.Button.LayoutOrder = #host:GetChildren()
@@ -2039,28 +2044,11 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Size = UDim2.new(1, -KeypickerModeAffordanceWidth, 1, 0),
+			Size = UDim2.fromScale(1, 1),
 			Text = displayText,
 			TextColor3 = COLORS.Text,
 			TextSize = 11,
 			TextTransparency = 0.12,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextYAlignment = Enum.TextYAlignment.Center,
-			ZIndex = 11,
-			Parent = keypicker.Button,
-		})
-		keypicker.ModeAffordance = Veil.Instance:Create("TextLabel", {
-			Name = "ModeAffordance",
-			AnchorPoint = Vector2.new(1, 0.5),
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Font = Enum.Font.GothamMedium,
-			Position = UDim2.new(1, -4, 0.5, 0),
-			Size = UDim2.fromOffset(KeypickerModeAffordanceWidth, AccessoryButtonHeight),
-			Text = "v",
-			TextColor3 = COLORS.Text,
-			TextSize = 9,
-			TextTransparency = 0.35,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextYAlignment = Enum.TextYAlignment.Center,
 			ZIndex = 11,
@@ -2073,7 +2061,7 @@ return function(Toolkit, Veil)
 			Name = "AxisKeypickerModeMenu",
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(KeypickerModeMenuWidth, (#allowedModes * KeypickerModeRowHeight) + 8),
+			Size = UDim2.fromOffset(KeypickerModeMenuWidth, getModeMenuHeight(#allowedModes)),
 			Visible = false,
 			ZIndex = 260,
 			Parent = pickerSurface,
@@ -2132,7 +2120,7 @@ return function(Toolkit, Veil)
 		end
 
 		function keypicker:_refreshButton()
-			local width = math.max(KeypickerMinWidth, math.ceil(measureText(self.Capturing and "..." or self.Value, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding + KeypickerModeAffordanceWidth)
+			local width = math.max(KeypickerMinWidth, math.ceil(measureText(self.Capturing and "..." or self.Value, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding)
 			local active = self:GetState()
 			self.Button.Size = UDim2.fromOffset(width, AccessoryButtonHeight)
 			self.ButtonLabel.Text = self.Capturing and "..." or self.Value
@@ -2140,8 +2128,6 @@ return function(Toolkit, Veil)
 			self.Button.BackgroundTransparency = self.Disabled and 0.2 or (active and 0.82 or 0)
 			self.ButtonLabel.TextTransparency = self.Disabled and 0.45 or 0.12
 			self.ButtonLabel.TextColor3 = self.Capturing and COLORS.Accent or (active and COLORS.Accent or COLORS.Text)
-			self.ModeAffordance.TextTransparency = self.Disabled and 0.55 or 0.35
-			self.ModeAffordance.TextColor3 = active and COLORS.Accent or COLORS.Text
 			self:_refreshModeButtons()
 			refreshAccessoryWidth(control)
 		end
@@ -2158,7 +2144,7 @@ return function(Toolkit, Veil)
 			end
 
 			self.ModeMenu.Visible = true
-			self.Window:_positionMenuPopup(self.Button, self.ModeMenu, KeypickerModeMenuWidth, (#self.Modes * KeypickerModeRowHeight) + 8)
+			self.Window:_positionMenuPopup(self.Button, self.ModeMenu, KeypickerModeMenuWidth, getModeMenuHeight(#self.Modes))
 		end
 
 		function keypicker:SetMode(mode, setOptions)
@@ -2237,18 +2223,6 @@ return function(Toolkit, Veil)
 
 		keypicker.Button.MouseButton1Click:Connect(function()
 			if keypicker.Disabled or control.Disabled then
-				return
-			end
-
-			local mousePoint = UserInputService:GetMouseLocation()
-			if isPointInside(keypicker.ModeAffordance, mousePoint) then
-				keypicker.Capturing = false
-				if keypicker.ModeMenu.Visible then
-					keypicker:CloseModeMenu()
-				else
-					keypicker:OpenModeMenu()
-				end
-				keypicker:_refreshButton()
 				return
 			end
 
@@ -2384,7 +2358,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = initialColor,
 			BorderSizePixel = 0,
 			Position = UDim2.new(0.5, 0, 0.5, 0),
-			Size = UDim2.new(1, -6, 1, -6),
+			Size = UDim2.new(1, -4, 1, -4),
 			ZIndex = 11,
 			Parent = colorpicker.Button,
 		})
@@ -2442,12 +2416,13 @@ return function(Toolkit, Veil)
 			Parent = colorpicker.PopupPreview,
 		})
 
+		local pickerBodyHeight = PickerMapSize.Y
 		local pickerBody = Veil.Instance:Create("Frame", {
 			Name = "PickerBody",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(PickerPadding, PickerPadding + PickerPreviewHeight + 8),
-			Size = UDim2.new(1, -(PickerPadding * 2), 1, -(PickerPadding * 2) - PickerPreviewHeight - 8),
+			Size = UDim2.new(1, -(PickerPadding * 2), 0, pickerBodyHeight),
 			ZIndex = 261,
 			Parent = colorpicker.Popup,
 		})
@@ -2563,7 +2538,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.Gotham,
-			Position = UDim2.fromOffset(PickerPadding, PickerPopupHeight - 24),
+			Position = UDim2.fromOffset(PickerPadding, PickerPadding + PickerPreviewHeight + 8 + pickerBodyHeight + 8),
 			Size = UDim2.new(1, -(PickerPadding * 2), 0, 14),
 			Text = "Alpha support reserved",
 			TextColor3 = COLORS.Text,
@@ -2654,6 +2629,7 @@ return function(Toolkit, Veil)
 				return
 			end
 
+			self:HideTooltip(control)
 			Axis:_closeActivePicker(colorpicker.Popup)
 			Axis.ActivePickerPopup = colorpicker.Popup
 			colorpicker.Popup.Visible = true
