@@ -283,8 +283,7 @@ return function(Toolkit, Veil)
 		local color = isHeld and COLORS.Accent or COLORS.Stroke
 		local transparency = isHeld and 0.7 or STROKE_TRANSPARENCY
 
-		divider.BackgroundColor3 = color
-		divider.BackgroundTransparency = isHeld and 0.7 or 1
+		divider.BackgroundTransparency = 1
 		line.BackgroundColor3 = color
 		line.BackgroundTransparency = transparency
 		handle.BackgroundColor3 = color
