@@ -602,8 +602,10 @@ return function(Toolkit, Veil)
 		self.Cursor = Veil.Instance:Create("Frame", {
 			Name = "CrossCursor",
 			AnchorPoint = Vector2.new(0.5, 0.5),
+			Active = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
+			Interactable = false,
 			Size = UDim2.fromOffset(17, 17),
 			ZIndex = 101,
 			Parent = self.Surface,
@@ -619,9 +621,11 @@ return function(Toolkit, Veil)
 		for _, part in ipairs(cursorParts) do
 			Veil.Instance:Create("Frame", {
 				Name = part.Name,
+				Active = false,
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundColor3 = part.Color,
 				BorderSizePixel = 0,
+				Interactable = false,
 				Position = part.Position,
 				Size = part.Size,
 				ZIndex = part.Z,
