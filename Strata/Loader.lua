@@ -279,8 +279,6 @@ local steps = {
 			local left = homeTab.Columns.leftColumn
 			local middle = homeTab.Columns.middleColumn
 			local right = homeTab.Columns.rightColumn
-
-			left:SectionHeader("Toggles")
 			
 			local toggle = left:CreateToggle({
 				Text = "Example Toggle",
