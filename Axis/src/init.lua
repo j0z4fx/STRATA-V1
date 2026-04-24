@@ -39,6 +39,20 @@ return function(Toolkit, Veil)
 	local ToastWidth = 320
 	local NotificationWidth = 340
 	local WindowDragSmoothness = 0.1
+	local TabTransitionTime = 0.18
+	local TabTransitionDistance = 18
+	local ColumnPaddingX = 14
+	local ColumnPaddingY = 14
+	local ColumnItemSpacing = 10
+	local ToggleRowHeight = 38
+	local ToggleRowWithSubtextHeight = 52
+	local ToggleSwitchWidth = 34
+	local ToggleSwitchHeight = 20
+	local ToggleDotSize = 16
+	local ToggleAnimationTime = 0.22
+	local ToggleTooltipDelay = 0.8
+	local TooltipOffset = Vector2.new(16, -10)
+	local TooltipMaxWidth = 260
 	local Lucide
 
 	local function loadLucide()
@@ -79,6 +93,9 @@ return function(Toolkit, Veil)
 		Stroke = Color3.fromRGB(255, 255, 255),
 		Text = Color3.fromRGB(238, 238, 242),
 		Accent = Color3.fromRGB(242, 168, 190),
+		ToggleOffBackground = Color3.fromRGB(36, 36, 41),
+		ToggleOffDot = Color3.fromRGB(68, 68, 78),
+		ToggleOnDot = Color3.fromRGB(255, 255, 255),
 	}
 
 	local STROKE_TRANSPARENCY = 0.935
@@ -204,6 +221,19 @@ return function(Toolkit, Veil)
 			Thickness = 1,
 			Parent = parent,
 		})
+	end
+
+	local function safeCallback(callback, ...)
+		if not Toolkit.Util.IsCallable(callback) then
+			return true
+		end
+
+		local success, result = Toolkit.Util.Try(callback, ...)
+		if not success then
+			warn("[Axis] Callback failed:", result)
+		end
+
+		return success, result
 	end
 
 	local function setOverlayVisualState(card, isVisible)
@@ -414,6 +444,36 @@ return function(Toolkit, Veil)
 		line.BackgroundTransparency = transparency
 		handle.BackgroundColor3 = color
 		handle.BackgroundTransparency = transparency
+	end
+
+	local function ensureColumnStack(column)
+		local existing = column:FindFirstChild("AxisColumnPadding")
+		if existing then
+			return
+		end
+
+		local padding = createPadding(column, ColumnPaddingY, ColumnPaddingX, ColumnPaddingY, ColumnPaddingX)
+		padding.Name = "AxisColumnPadding"
+		Veil.Instance:Create("UIListLayout", {
+			Name = "AxisColumnLayout",
+			FillDirection = Enum.FillDirection.Vertical,
+			Padding = UDim.new(0, ColumnItemSpacing),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Parent = column,
+		})
+	end
+
+	local function resolveTabColumn(tab, columnName)
+		local normalized = string.lower(tostring(columnName or "left"))
+		if normalized == "middle" or normalized == "middlecolumn" then
+			return tab.middleColumn or tab.leftColumn
+		end
+
+		if normalized == "right" or normalized == "rightcolumn" then
+			return tab.rightColumn or tab.leftColumn
+		end
+
+		return tab.leftColumn
 	end
 
 	local function applyColumnLayout(tab)
@@ -776,6 +836,10 @@ return function(Toolkit, Veil)
 		self.SelectedTab = nil
 		self.CleanupConnections = {}
 		self.CursorVisible = true
+		self.TabTransitionTweens = {}
+		self.TooltipToken = 0
+		self.ActiveTooltipAnchor = nil
+		self.ActiveTooltipText = nil
 
 		self.Frame = Veil.Instance:Create("Frame", {
 			Name = "Window",
@@ -941,6 +1005,7 @@ return function(Toolkit, Veil)
 			Name = "TabContentHost",
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
+			ClipsDescendants = true,
 			Size = UDim2.fromScale(1, 1),
 			ZIndex = 2,
 			Parent = self.Content,
@@ -989,6 +1054,15 @@ return function(Toolkit, Veil)
 			if self.Cursor then
 				self.Cursor.Position = UDim2.fromOffset(mouseLocation.X, mouseLocation.Y)
 				self.Cursor.Visible = self.CursorVisible
+			end
+
+			if self.Tooltip and self.Tooltip.Visible and self.ActiveTooltipAnchor then
+				local viewportSize = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)
+				local tooltipWidth = self.Tooltip.AbsoluteSize.X
+				local tooltipHeight = self.Tooltip.AbsoluteSize.Y
+				local nextX = math.clamp(mouseLocation.X + TooltipOffset.X, 10, math.max(10, viewportSize.X - tooltipWidth - 10))
+				local nextY = math.clamp(mouseLocation.Y + TooltipOffset.Y, tooltipHeight + 10, math.max(tooltipHeight + 10, viewportSize.Y - 10))
+				self.Tooltip.Position = UDim2.fromOffset(nextX, nextY)
 			end
 
 			for _, tab in ipairs(self.Tabs) do
@@ -1047,7 +1121,147 @@ return function(Toolkit, Veil)
 			self.Cursor = nil
 		end
 
+		if self.Tooltip then
+			Veil.Instance:SecureDestroy(self.Tooltip)
+			self.Tooltip = nil
+			self.TooltipLabel = nil
+		end
+
+		for _, tab in ipairs(self.Tabs) do
+			if tab.ToggleControls then
+				for _, toggle in ipairs(tab.ToggleControls) do
+					toggle.Destroyed = true
+					if toggle.ChangedSignal then
+						toggle.ChangedSignal:Destroy()
+					end
+				end
+			end
+		end
+
 		UserInputService.MouseIconEnabled = true
+	end
+
+	function Window:_ensureTooltip()
+		if self.Tooltip then
+			return self.Tooltip
+		end
+
+		self.Tooltip = Veil.Instance:Create("Frame", {
+			Name = "AxisTooltip",
+			Active = false,
+			AutomaticSize = Enum.AutomaticSize.XY,
+			BackgroundColor3 = COLORS.Window,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Interactable = false,
+			Visible = false,
+			ZIndex = 250,
+			Parent = self.Surface,
+		})
+		createCorner(self.Tooltip, 10)
+		createBorder(self.Tooltip)
+		createPadding(self.Tooltip, 8, 10, 8, 10)
+
+		self.TooltipLabel = Veil.Instance:Create("TextLabel", {
+			Name = "TooltipText",
+			AutomaticSize = Enum.AutomaticSize.XY,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.Gotham,
+			Interactable = false,
+			Size = UDim2.fromOffset(0, 0),
+			Text = "",
+			TextColor3 = COLORS.Text,
+			TextSize = 12,
+			TextTransparency = 1,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			ZIndex = 251,
+			Parent = self.Tooltip,
+		})
+
+		return self.Tooltip
+	end
+
+	function Window:HideTooltip(anchor)
+		if anchor and self.ActiveTooltipAnchor and self.ActiveTooltipAnchor ~= anchor then
+			return
+		end
+
+		self.TooltipToken = self.TooltipToken + 1
+		self.ActiveTooltipAnchor = nil
+		self.ActiveTooltipText = nil
+
+		if not self.Tooltip then
+			return
+		end
+
+		local fadeOut = TweenService:Create(self.Tooltip, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 1,
+		})
+		local textFade = TweenService:Create(self.TooltipLabel, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			TextTransparency = 1,
+		})
+
+		local connection
+		connection = fadeOut.Completed:Connect(function()
+			if connection then
+				connection:Disconnect()
+			end
+			if self.Tooltip then
+				self.Tooltip.Visible = false
+			end
+		end)
+
+		fadeOut:Play()
+		textFade:Play()
+	end
+
+	function Window:ShowTooltip(anchor, text)
+		if type(text) ~= "string" or text == "" then
+			return
+		end
+
+		self:_ensureTooltip()
+		self.ActiveTooltipAnchor = anchor
+		self.ActiveTooltipText = text
+		self.TooltipLabel.Text = text
+		self.TooltipLabel.TextWrapped = false
+		self.Tooltip.Visible = true
+		self.Tooltip.BackgroundTransparency = 1
+		self.TooltipLabel.TextTransparency = 1
+
+		local singleLineSize = measureText(text, 12, Enum.Font.Gotham)
+		if singleLineSize.X > TooltipMaxWidth then
+			self.TooltipLabel.Size = UDim2.fromOffset(TooltipMaxWidth, 0)
+			self.TooltipLabel.AutomaticSize = Enum.AutomaticSize.Y
+			self.TooltipLabel.TextWrapped = true
+		else
+			self.TooltipLabel.AutomaticSize = Enum.AutomaticSize.XY
+			self.TooltipLabel.Size = UDim2.fromOffset(0, 0)
+		end
+
+		TweenService:Create(self.Tooltip, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 0,
+		}):Play()
+		TweenService:Create(self.TooltipLabel, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			TextTransparency = 0.12,
+		}):Play()
+	end
+
+	local function cancelTabTransition(self)
+		for _, tween in ipairs(self.TabTransitionTweens or {}) do
+			if tween and tween.Cancel then
+				tween:Cancel()
+			end
+		end
+
+		self.TabTransitionTweens = {}
+
+		for _, entry in ipairs(self.Tabs) do
+			entry.Content.Position = UDim2.fromOffset(0, 0)
+		end
 	end
 
 	function Window:SelectTab(tab)
@@ -1055,14 +1269,60 @@ return function(Toolkit, Veil)
 			return tab
 		end
 
-		for _, entry in ipairs(self.Tabs) do
-			local isSelected = entry == tab
-			entry.Content.Visible = isSelected
-			setTabButtonVisual(entry, isSelected, COLORS)
-			if isSelected then
-				self.SelectedTab = entry
-			end
+		cancelTabTransition(self)
+
+		local previousTab = self.SelectedTab
+		local direction = 1
+		if previousTab and previousTab.Order > tab.Order then
+			direction = -1
 		end
+
+		for _, entry in ipairs(self.Tabs) do
+			setTabButtonVisual(entry, entry == tab, COLORS)
+		end
+
+		if not previousTab then
+			tab.Content.Position = UDim2.fromOffset(0, 0)
+			tab.Content.Visible = true
+			self.SelectedTab = tab
+			return self.SelectedTab
+		end
+
+		if previousTab == tab then
+			return tab
+		end
+
+		previousTab.Content.Visible = true
+		previousTab.Content.Position = UDim2.fromOffset(0, 0)
+		tab.Content.Visible = true
+		tab.Content.Position = UDim2.fromOffset(direction * TabTransitionDistance, 0)
+		tab.Content.ZIndex = previousTab.Content.ZIndex + 1
+
+		local outgoingTween = TweenService:Create(previousTab.Content, TweenInfo.new(TabTransitionTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Position = UDim2.fromOffset(-(direction * TabTransitionDistance), 0),
+		})
+		local incomingTween = TweenService:Create(tab.Content, TweenInfo.new(TabTransitionTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Position = UDim2.fromOffset(0, 0),
+		})
+
+		table.insert(self.TabTransitionTweens, outgoingTween)
+		table.insert(self.TabTransitionTweens, incomingTween)
+
+		local completionConnection
+		completionConnection = incomingTween.Completed:Connect(function()
+			if completionConnection then
+				completionConnection:Disconnect()
+			end
+			previousTab.Content.Visible = false
+			previousTab.Content.Position = UDim2.fromOffset(0, 0)
+			tab.Content.Position = UDim2.fromOffset(0, 0)
+			tab.Content.ZIndex = 2
+			self.TabTransitionTweens = {}
+		end)
+
+		outgoingTween:Play()
+		incomingTween:Play()
+		self.SelectedTab = tab
 
 		return self.SelectedTab
 	end
@@ -1076,6 +1336,8 @@ return function(Toolkit, Veil)
 			Order = #self.Tabs + 1,
 			IconScale = type(options.IconScale) == "number" and options.IconScale or 1,
 			PinnedBottom = options.PinnedBottom == true or options.Dock == "Bottom",
+			Window = self,
+			ToggleControls = {},
 		}
 		tab.IsSettings = options.Settings == true or string.lower(tab.Name) == "settings"
 		local baseIconSize = TabButtonSize - (TabIconInset * 2)
@@ -1158,6 +1420,11 @@ return function(Toolkit, Veil)
 
 		tab.leftColumn, tab.middleColumn, tab.rightColumn = createColumns(self, tab, tab.Content, tab.IsSettings and "Double" or "Triple")
 
+		function tab:CreateToggle(toggleOptions)
+			return self.Window:_createToggle(self, toggleOptions)
+		end
+		tab.AddToggle = tab.CreateToggle
+
 		tab.Button.MouseButton1Click:Connect(function()
 			self:SelectTab(tab)
 		end)
@@ -1170,6 +1437,282 @@ return function(Toolkit, Veil)
 		end
 
 		return tab
+	end
+
+	function Window:_createToggle(tab, options)
+		options = options or {}
+
+		local parentColumn = resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local subtext = options.Subtext or options.Description or options.Desc
+		local hasSubtext = type(subtext) == "string" and subtext ~= ""
+		local defaultValue = options.Default
+		if defaultValue == nil then
+			defaultValue = options.Value
+		end
+
+		local toggle = {
+			Type = "Toggle",
+			Name = options.Name or options.Text or string.format("Toggle%d", #tab.ToggleControls + 1),
+			Text = options.Text or options.Name or "Toggle",
+			Subtext = hasSubtext and subtext or nil,
+			Tooltip = not hasSubtext and options.Tooltip or nil,
+			Value = defaultValue == nil and false or (not not defaultValue),
+			Disabled = options.Disabled == true,
+			Visible = options.Visible ~= false,
+			Callback = options.Callback,
+			ChangedSignal = Toolkit.Signal.new(),
+			Tab = tab,
+			Window = self,
+			Hovering = false,
+			Destroyed = false,
+		}
+
+		local rowHeight = hasSubtext and ToggleRowWithSubtextHeight or ToggleRowHeight
+
+		toggle.Holder = Veil.Instance:Create("Frame", {
+			Name = toggle.Name,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			LayoutOrder = #tab.ToggleControls + 1,
+			Size = UDim2.new(1, 0, 0, rowHeight),
+			Visible = toggle.Visible,
+			Parent = parentColumn,
+		})
+
+		toggle.Button = Veil.Instance:Create("TextButton", {
+			Name = "Hitbox",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			Text = "",
+			ZIndex = 8,
+			Parent = toggle.Holder,
+		})
+
+		toggle.LabelWrap = Veil.Instance:Create("Frame", {
+			Name = "LabelWrap",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(0, hasSubtext and 2 or 0),
+			Size = UDim2.new(1, -(ToggleSwitchWidth + 16), 1, hasSubtext and -4 or 0),
+			ZIndex = 5,
+			Parent = toggle.Holder,
+		})
+
+		toggle.TitleLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Title",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.fromOffset(0, 0),
+			Size = UDim2.new(1, 0, 0, 18),
+			Text = toggle.Text,
+			TextColor3 = COLORS.Text,
+			TextSize = 14,
+			TextTransparency = 0,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 5,
+			Parent = toggle.LabelWrap,
+		})
+
+		if hasSubtext then
+			toggle.SubtextLabel = Veil.Instance:Create("TextLabel", {
+				Name = "Subtext",
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Font = Enum.Font.Gotham,
+				Position = UDim2.fromOffset(0, 18),
+				Size = UDim2.new(1, 0, 0, 16),
+				Text = toggle.Subtext,
+				TextColor3 = COLORS.Text,
+				TextSize = 12,
+				TextTransparency = 0.35,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				ZIndex = 5,
+				Parent = toggle.LabelWrap,
+			})
+		end
+
+		toggle.Switch = Veil.Instance:Create("Frame", {
+			Name = "Switch",
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundColor3 = COLORS.ToggleOffBackground,
+			BorderSizePixel = 0,
+			Position = UDim2.new(1, 0, 0.5, 0),
+			Size = UDim2.fromOffset(ToggleSwitchWidth, ToggleSwitchHeight),
+			ZIndex = 5,
+			Parent = toggle.Holder,
+		})
+		createCorner(toggle.Switch, ToggleSwitchHeight / 2)
+
+		toggle.SwitchDot = Veil.Instance:Create("Frame", {
+			Name = "Dot",
+			AnchorPoint = Vector2.new(0, 0.5),
+			BackgroundColor3 = COLORS.ToggleOffDot,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(2, ToggleSwitchHeight / 2),
+			Size = UDim2.fromOffset(ToggleDotSize, ToggleDotSize),
+			ZIndex = 6,
+			Parent = toggle.Switch,
+		})
+		createCorner(toggle.SwitchDot, ToggleDotSize / 2)
+
+		toggle.SwitchStroke = Veil.Instance:Create("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = COLORS.Stroke,
+			Transparency = STROKE_TRANSPARENCY,
+			Thickness = 1,
+			Parent = toggle.Switch,
+		})
+
+		function toggle:_applyVisualState(value, visualOptions)
+			visualOptions = visualOptions or {}
+			local instant = visualOptions.Instant == true
+			local disabled = self.Disabled
+			local dotOnX = ToggleSwitchWidth - ToggleDotSize - 2
+			local dotOffX = 2
+			local targetBackground = value and COLORS.Accent or COLORS.ToggleOffBackground
+			local targetDotColor = value and COLORS.ToggleOnDot or COLORS.ToggleOffDot
+			local targetDotPosition = UDim2.fromOffset(value and dotOnX or dotOffX, ToggleSwitchHeight / 2)
+			local titleTransparency = disabled and 0.45 or 0
+			local subtextTransparency = disabled and 0.6 or 0.35
+			local switchTransparency = disabled and 0.25 or 0
+			local dotTransparency = disabled and 0.15 or 0
+
+			if instant then
+				self.Switch.BackgroundColor3 = targetBackground
+				self.Switch.BackgroundTransparency = switchTransparency
+				self.SwitchDot.BackgroundColor3 = targetDotColor
+				self.SwitchDot.BackgroundTransparency = dotTransparency
+				self.SwitchDot.Position = targetDotPosition
+				self.TitleLabel.TextTransparency = titleTransparency
+				if self.SubtextLabel then
+					self.SubtextLabel.TextTransparency = subtextTransparency
+				end
+				return
+			end
+
+			TweenService:Create(self.Switch, TweenInfo.new(ToggleAnimationTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+				BackgroundColor3 = targetBackground,
+				BackgroundTransparency = switchTransparency,
+			}):Play()
+			TweenService:Create(self.SwitchDot, TweenInfo.new(ToggleAnimationTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+				BackgroundColor3 = targetDotColor,
+				BackgroundTransparency = dotTransparency,
+				Position = targetDotPosition,
+			}):Play()
+			TweenService:Create(self.TitleLabel, TweenInfo.new(ToggleAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				TextTransparency = titleTransparency,
+			}):Play()
+			if self.SubtextLabel then
+				TweenService:Create(self.SubtextLabel, TweenInfo.new(ToggleAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					TextTransparency = subtextTransparency,
+				}):Play()
+			end
+		end
+
+		function toggle:Set(value, setOptions)
+			setOptions = setOptions or {}
+			local normalized = not not value
+			local changed = normalized ~= self.Value
+
+			if self.Disabled and changed then
+				return self.Value
+			end
+
+			self.Value = normalized
+			self:_applyVisualState(normalized, {
+				Instant = setOptions.Instant == true,
+			})
+
+			if changed and setOptions.Silent ~= true then
+				safeCallback(self.Callback, self.Value)
+				self.ChangedSignal:Fire(self.Value)
+			end
+
+			return self.Value
+		end
+
+		function toggle:Toggle(setOptions)
+			return self:Set(not self.Value, setOptions)
+		end
+
+		function toggle:Enable(setOptions)
+			return self:Set(true, setOptions)
+		end
+
+		function toggle:Disable(setOptions)
+			return self:Set(false, setOptions)
+		end
+
+		function toggle:IsEnabled()
+			return self.Value
+		end
+
+		function toggle:SetDisabled(disabled)
+			self.Disabled = disabled == true
+			self.Button.Active = not self.Disabled
+			if self.Disabled then
+				self.Window:HideTooltip(self)
+			end
+			self:_applyVisualState(self.Value, {
+				Instant = false,
+			})
+		end
+
+		function toggle:SetVisible(visible)
+			self.Visible = visible ~= false
+			self.Holder.Visible = self.Visible
+			if not self.Visible then
+				self.Window:HideTooltip(self)
+			end
+		end
+
+		function toggle:OnChanged(callback)
+			local connection = self.ChangedSignal:Connect(callback)
+			safeCallback(callback, self.Value)
+			return connection
+		end
+
+		toggle.Button.MouseButton1Click:Connect(function()
+			toggle:Toggle()
+		end)
+
+		if not hasSubtext and type(toggle.Tooltip) == "string" and toggle.Tooltip ~= "" then
+			toggle.Button.MouseEnter:Connect(function()
+				toggle.Hovering = true
+				self.TooltipToken = self.TooltipToken + 1
+				local token = self.TooltipToken
+				task.delay(ToggleTooltipDelay, function()
+					if toggle.Destroyed or not toggle.Hovering or toggle.Disabled then
+						return
+					end
+					if self.TooltipToken ~= token then
+						return
+					end
+					self:ShowTooltip(toggle, toggle.Tooltip)
+				end)
+			end)
+
+			toggle.Button.MouseLeave:Connect(function()
+				toggle.Hovering = false
+				self:HideTooltip(toggle)
+			end)
+		end
+
+		toggle.Button.Active = not toggle.Disabled
+		toggle:Set(toggle.Value, {
+			Silent = true,
+			Instant = true,
+		})
+
+		table.insert(tab.ToggleControls, toggle)
+		return toggle
 	end
 
 	Axis.Surface = Veil.GUI:CreateRoot("Axis")
