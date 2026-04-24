@@ -46,6 +46,10 @@ return function(Toolkit, Veil)
 	local ColumnPaddingX = 14
 	local ColumnPaddingY = 14
 	local ColumnItemSpacing = 10
+	local LabelRowHeight = 18
+	local LabelRowWithSubtextHeight = 38
+	local DividerInsetX = 6
+	local SectionHeaderGap = 10
 	local ToggleRowHeight = 30
 	local ToggleRowWithSubtextHeight = 52
 	local ToggleSwitchWidth = 34
@@ -55,6 +59,19 @@ return function(Toolkit, Veil)
 	local ToggleTooltipDelay = 0.8
 	local TooltipOffset = Vector2.new(16, -10)
 	local TooltipMaxWidth = 260
+	local AccessorySpacing = 6
+	local AccessoryButtonHeight = 20
+	local AccessoryInsetRight = 2
+	local AccessoryTextPadding = 8
+	local KeypickerMinWidth = 28
+	local ColorpickerButtonSize = 20
+	local PickerPopupWidth = 186
+	local PickerPopupHeight = 156
+	local PickerPadding = 10
+	local PickerMapSize = Vector2.new(122, 122)
+	local PickerHueWidth = 12
+	local PickerPreviewHeight = 22
+	local PickerCornerRadius = 10
 	local Lucide
 
 	local function loadLucide()
@@ -498,6 +515,207 @@ return function(Toolkit, Veil)
 		end
 
 		return tab.leftColumn
+	end
+
+	local function createTextRow(parent, name, height)
+		return Veil.Instance:Create("Frame", {
+			Name = name,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			LayoutOrder = 999,
+			Size = UDim2.new(1, 0, 0, height),
+			Parent = parent,
+		})
+	end
+
+	local function getViewportSize()
+		local camera = workspace.CurrentCamera
+		if camera then
+			return camera.ViewportSize
+		end
+
+		return Vector2.new(1920, 1080)
+	end
+
+	local function getControlTextRightInset(control)
+		local accessoryWidth = control.AccessoryWidth or 0
+		local baseInset = 0
+
+		if control.Type == "Toggle" then
+			baseInset = ToggleSwitchWidth + 16
+		end
+
+		if accessoryWidth > 0 then
+			baseInset = baseInset + accessoryWidth + AccessorySpacing
+		end
+
+		return baseInset
+	end
+
+	local function updateControlAccessoryLayout(control)
+		if not control then
+			return
+		end
+
+		local accessoryWidth = control.AccessoryWidth or 0
+
+		if control.AccessoryHost then
+			control.AccessoryHost.Size = UDim2.fromOffset(accessoryWidth, control.RowHeight or AccessoryButtonHeight)
+		end
+
+		if control.Type == "Toggle" then
+			local inset = getControlTextRightInset(control)
+			control.LabelWrap.Size = control.HasSubtext
+				and UDim2.new(1, -inset, 1, -12)
+				or UDim2.new(1, -inset, 1, 0)
+			if control.AccessoryHost then
+				control.AccessoryHost.Position = UDim2.new(1, -(ToggleSwitchWidth + AccessorySpacing), 0.5, 0)
+			end
+		else
+			local inset = getControlTextRightInset(control)
+			local sizeOffset = inset > 0 and -inset or 0
+			control.TitleLabel.Size = UDim2.new(1, sizeOffset, 0, 18)
+			if control.SubtextLabel then
+				control.SubtextLabel.Size = UDim2.new(1, sizeOffset, 0, 16)
+			end
+			if control.AccessoryHost then
+				control.AccessoryHost.Position = UDim2.new(1, -AccessoryInsetRight, 0.5, 0)
+			end
+		end
+	end
+
+	local function ensureAccessoryHost(control)
+		if control.AccessoryHost then
+			return control.AccessoryHost
+		end
+
+		control.AccessoryWidth = control.AccessoryWidth or 0
+
+		local host = Veil.Instance:Create("Frame", {
+			Name = "AccessoryHost",
+			AnchorPoint = Vector2.new(1, 0.5),
+			AutomaticSize = Enum.AutomaticSize.None,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.new(1, 0, 0.5, 0),
+			Size = UDim2.fromOffset(0, control.RowHeight or AccessoryButtonHeight),
+			ZIndex = 6,
+			Parent = control.Holder,
+		})
+
+		Veil.Instance:Create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Right,
+			Padding = UDim.new(0, AccessorySpacing),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Parent = host,
+		})
+
+		control.AccessoryHost = host
+		updateControlAccessoryLayout(control)
+
+		return host
+	end
+
+	local function registerAccessory(control, width)
+		ensureAccessoryHost(control)
+
+		if control.AccessoryWidth and control.AccessoryWidth > 0 then
+			control.AccessoryWidth = control.AccessoryWidth + AccessorySpacing + width
+		else
+			control.AccessoryWidth = width
+		end
+		updateControlAccessoryLayout(control)
+	end
+
+	local function refreshAccessoryWidth(control)
+		if not control or not control.AccessoryHost then
+			return 0
+		end
+
+		local width = 0
+		local count = 0
+
+		for _, child in ipairs(control.AccessoryHost:GetChildren()) do
+			if child:IsA("GuiObject") and not child:IsA("UIListLayout") then
+				width = width + child.Size.X.Offset
+				count = count + 1
+			end
+		end
+
+		if count > 1 then
+			width = width + ((count - 1) * AccessorySpacing)
+		end
+
+		control.AccessoryWidth = width
+		updateControlAccessoryLayout(control)
+		return width
+	end
+
+	local function normalizeKeyValue(key)
+		if typeof(key) == "EnumItem" then
+			if key.EnumType == Enum.KeyCode then
+				return key.Name
+			end
+
+			if key.EnumType == Enum.UserInputType then
+				if key == Enum.UserInputType.MouseButton1 then
+					return "MB1"
+				elseif key == Enum.UserInputType.MouseButton2 then
+					return "MB2"
+				elseif key == Enum.UserInputType.MouseButton3 then
+					return "MB3"
+				end
+			end
+		elseif type(key) == "string" then
+			local normalized = key:gsub("^%s+", ""):gsub("%s+$", "")
+			if normalized == "" then
+				return "None"
+			end
+			return normalized
+		end
+
+		return "None"
+	end
+
+	local function keyMatchesInput(key, input)
+		if not key or key == "None" or not input then
+			return false
+		end
+
+		if key == "MB1" then
+			return input.UserInputType == Enum.UserInputType.MouseButton1
+		elseif key == "MB2" then
+			return input.UserInputType == Enum.UserInputType.MouseButton2
+		elseif key == "MB3" then
+			return input.UserInputType == Enum.UserInputType.MouseButton3
+		end
+
+		return input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode.Name == key
+	end
+
+	local function makeAccessoryButton(parent, name, width)
+		local button = Veil.Instance:Create("TextButton", {
+			Name = name,
+			AutoButtonColor = false,
+			BackgroundColor3 = COLORS.ToggleOffBackground,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(width, AccessoryButtonHeight),
+			Text = "",
+			ZIndex = 10,
+			Parent = parent,
+		})
+		createCorner(button, 6)
+		Veil.Instance:Create("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = COLORS.Stroke,
+			Transparency = STROKE_TRANSPARENCY,
+			Thickness = 1,
+			Parent = button,
+		})
+
+		return button
 	end
 
 	local function applyColumnLayout(tab)
@@ -1159,6 +1377,21 @@ return function(Toolkit, Veil)
 					end
 				end
 			end
+
+			if tab.AccessoryControls then
+				for _, accessory in ipairs(tab.AccessoryControls) do
+					if accessory.ChangedSignal then
+						accessory.ChangedSignal:Destroy()
+					end
+					if accessory.TriggeredSignal then
+						accessory.TriggeredSignal:Destroy()
+					end
+					if accessory.Popup then
+						Veil.Instance:SecureDestroy(accessory.Popup)
+						accessory.Popup = nil
+					end
+				end
+			end
 		end
 
 		UserInputService.MouseIconEnabled = true
@@ -1301,6 +1534,7 @@ return function(Toolkit, Veil)
 			PinnedBottom = options.PinnedBottom == true or options.Dock == "Bottom",
 			Window = self,
 			ToggleControls = {},
+			AccessoryControls = {},
 		}
 		tab.IsSettings = options.Settings == true or string.lower(tab.Name) == "settings"
 		local baseIconSize = TabButtonSize - (TabIconInset * 2)
@@ -1391,10 +1625,66 @@ return function(Toolkit, Veil)
 
 		tab.leftColumn, tab.middleColumn, tab.rightColumn = createColumns(self, tab, tab.Content, tab.IsSettings and "Double" or "Triple")
 
+		local function makeColumnApi(frame)
+			return {
+				Frame = frame,
+				Tab = tab,
+				Window = self,
+				Label = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createLabel(columnApi.Tab, elementOptions)
+				end,
+				SubLabel = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createLabel(columnApi.Tab, elementOptions)
+				end,
+				Divider = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createDivider(columnApi.Tab, elementOptions)
+				end,
+				SectionHeader = function(columnApi, textOrOptions)
+					local elementOptions = type(textOrOptions) == "table" and textOrOptions or { Text = textOrOptions }
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createSectionHeader(columnApi.Tab, elementOptions)
+				end,
+				CreateToggle = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createToggle(columnApi.Tab, elementOptions)
+				end,
+				AddToggle = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createToggle(columnApi.Tab, elementOptions)
+				end,
+			}
+		end
+
+		tab.Columns = {
+			leftColumn = makeColumnApi(tab.leftColumn),
+			rightColumn = makeColumnApi(tab.rightColumn),
+		}
+		if tab.middleColumn then
+			tab.Columns.middleColumn = makeColumnApi(tab.middleColumn)
+		end
+
 		function tab:CreateToggle(toggleOptions)
 			return self.Window:_createToggle(self, toggleOptions)
 		end
 		tab.AddToggle = tab.CreateToggle
+		function tab:Label(elementOptions)
+			return self.Window:_createLabel(self, elementOptions)
+		end
+		function tab:Divider(elementOptions)
+			return self.Window:_createDivider(self, elementOptions)
+		end
+		function tab:SectionHeader(textOrOptions)
+			local elementOptions = type(textOrOptions) == "table" and textOrOptions or { Text = textOrOptions }
+			return self.Window:_createSectionHeader(self, elementOptions)
+		end
 
 		tab.Button.MouseButton1Click:Connect(function()
 			self:SelectTab(tab)
@@ -1410,10 +1700,723 @@ return function(Toolkit, Veil)
 		return tab
 	end
 
+	function Window:_createLabel(tab, options)
+		options = options or {}
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local subtext = options.Subtext or options.Description or options.Desc
+		local hasSubtext = type(subtext) == "string" and subtext ~= ""
+		local holder = createTextRow(parentColumn, options.Name or "Label", hasSubtext and LabelRowWithSubtextHeight or LabelRowHeight)
+		holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+
+		local label = {
+			Type = "Label",
+			Text = options.Text or options.Name or "Label",
+			Subtext = hasSubtext and subtext or nil,
+			Holder = holder,
+			Tab = tab,
+			Window = self,
+			HasSubtext = hasSubtext,
+			RowHeight = hasSubtext and LabelRowWithSubtextHeight or LabelRowHeight,
+			AccessoryWidth = 0,
+		}
+
+		label.TitleLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Title",
+			AnchorPoint = hasSubtext and Vector2.new(0, 0) or Vector2.new(0, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = hasSubtext and UDim2.fromOffset(0, 0) or UDim2.new(0, 0, 0.5, 0),
+			Size = UDim2.new(1, 0, 0, 18),
+			Text = label.Text,
+			TextColor3 = COLORS.Text,
+			TextSize = 14,
+			TextTransparency = 0,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 5,
+			Parent = holder,
+		})
+
+		if hasSubtext then
+			label.SubtextLabel = Veil.Instance:Create("TextLabel", {
+				Name = "Subtext",
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Font = Enum.Font.Gotham,
+				Position = UDim2.fromOffset(0, 18),
+				Size = UDim2.new(1, 0, 0, 16),
+				Text = label.Subtext,
+				TextColor3 = COLORS.Text,
+				TextSize = 12,
+				TextTransparency = 0.35,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				ZIndex = 5,
+				Parent = holder,
+			})
+		end
+
+		function label:AddKeypicker(keypickerOptions)
+			return self.Window:_createKeypicker(self, keypickerOptions)
+		end
+
+		function label:AddColorpicker(colorpickerOptions)
+			return self.Window:_createColorpicker(self, colorpickerOptions)
+		end
+
+		function label:SetVisible(visible)
+			self.Holder.Visible = visible ~= false
+		end
+
+		return label
+	end
+
+	function Window:_createDivider(tab, options)
+		options = options or {}
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local holder = createTextRow(parentColumn, options.Name or "Divider", 8)
+		holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+
+		local line = Veil.Instance:Create("Frame", {
+			Name = "Line",
+			AnchorPoint = Vector2.new(0, 0.5),
+			BackgroundColor3 = COLORS.Stroke,
+			BackgroundTransparency = STROKE_TRANSPARENCY,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, DividerInsetX, 0.5, 0),
+			Size = UDim2.new(1, -(DividerInsetX * 2), 0, 1),
+			ZIndex = 4,
+			Parent = holder,
+		})
+
+		return {
+			Type = "Divider",
+			Holder = holder,
+			Line = line,
+			Tab = tab,
+			Window = self,
+		}
+	end
+
+	function Window:_createSectionHeader(tab, options)
+		options = options or {}
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local holder = createTextRow(parentColumn, options.Name or "SectionHeader", 18)
+		holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+
+		local text = options.Text or options.Name or "Section"
+		local textWidth = math.ceil(measureText(text, 12, Enum.Font.GothamMedium).X)
+		local clampedTextWidth = math.clamp(textWidth + 10, 36, 120)
+		local halfGap = math.floor((clampedTextWidth + SectionHeaderGap) * 0.5)
+
+		local centerLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Title",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			Size = UDim2.fromOffset(clampedTextWidth, 18),
+			Text = text,
+			TextColor3 = COLORS.Text,
+			TextSize = 12,
+			TextTransparency = 0.2,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 5,
+			Parent = holder,
+		})
+
+		local leftLine = Veil.Instance:Create("Frame", {
+			Name = "LeftLine",
+			AnchorPoint = Vector2.new(0, 0.5),
+			BackgroundColor3 = COLORS.Stroke,
+			BackgroundTransparency = STROKE_TRANSPARENCY,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, DividerInsetX, 0.5, 0),
+			Size = UDim2.new(0.5, -(DividerInsetX + halfGap), 0, 1),
+			ZIndex = 4,
+			Parent = holder,
+		})
+
+		local rightLine = Veil.Instance:Create("Frame", {
+			Name = "RightLine",
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundColor3 = COLORS.Stroke,
+			BackgroundTransparency = STROKE_TRANSPARENCY,
+			BorderSizePixel = 0,
+			Position = UDim2.new(1, -DividerInsetX, 0.5, 0),
+			Size = UDim2.new(0.5, -(DividerInsetX + halfGap), 0, 1),
+			ZIndex = 4,
+			Parent = holder,
+		})
+
+		return {
+			Type = "SectionHeader",
+			Holder = holder,
+			Label = centerLabel,
+			LeftLine = leftLine,
+			RightLine = rightLine,
+			Tab = tab,
+			Window = self,
+		}
+	end
+
+	function Window:_positionPickerPopup(anchorButton, popup)
+		if not anchorButton or not popup then
+			return
+		end
+
+		local viewportSize = getViewportSize()
+		local width = popup.AbsoluteSize.X > 0 and popup.AbsoluteSize.X or PickerPopupWidth
+		local height = popup.AbsoluteSize.Y > 0 and popup.AbsoluteSize.Y or PickerPopupHeight
+		local anchorPosition = anchorButton.AbsolutePosition
+		local anchorSize = anchorButton.AbsoluteSize
+		local nextX = anchorPosition.X + anchorSize.X - width
+		local nextY = anchorPosition.Y + anchorSize.Y + 8
+
+		nextX = math.clamp(nextX, 10, math.max(10, viewportSize.X - width - 10))
+		nextY = math.clamp(nextY, 10, math.max(10, viewportSize.Y - height - 10))
+
+		popup.Position = UDim2.fromOffset(nextX, nextY)
+	end
+
+	function Window:_createKeypicker(control, options)
+		options = options or {}
+
+		local host = ensureAccessoryHost(control)
+		local initialKey = normalizeKeyValue(options.Default or options.Key or "None")
+		local keypicker = {
+			Type = "Keypicker",
+			Window = self,
+			Control = control,
+			Value = initialKey,
+			Disabled = options.Disabled == true,
+			Callback = options.Callback or options.ActivatedCallback,
+			ChangedCallback = options.ChangedCallback or options.OnChangedCallback,
+			ChangedSignal = Toolkit.Signal.new(),
+			TriggeredSignal = Toolkit.Signal.new(),
+			Capturing = false,
+		}
+
+		local displayText = keypicker.Value
+		local buttonWidth = math.max(KeypickerMinWidth, math.ceil(measureText(displayText, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding)
+		keypicker.Button = makeAccessoryButton(host, "Keypicker", buttonWidth)
+		keypicker.Button.LayoutOrder = #host:GetChildren()
+		keypicker.ButtonLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Label",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Size = UDim2.fromScale(1, 1),
+			Text = displayText,
+			TextColor3 = COLORS.Text,
+			TextSize = 11,
+			TextTransparency = 0.12,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 11,
+			Parent = keypicker.Button,
+		})
+		registerAccessory(control, buttonWidth)
+
+		function keypicker:_refreshButton()
+			local width = math.max(KeypickerMinWidth, math.ceil(measureText(self.Capturing and "..." or self.Value, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding)
+			self.Button.Size = UDim2.fromOffset(width, AccessoryButtonHeight)
+			self.ButtonLabel.Text = self.Capturing and "..." or self.Value
+			self.Button.BackgroundTransparency = self.Disabled and 0.2 or 0
+			self.ButtonLabel.TextTransparency = self.Disabled and 0.45 or 0.12
+			self.ButtonLabel.TextColor3 = self.Capturing and COLORS.Accent or COLORS.Text
+			refreshAccessoryWidth(control)
+		end
+
+		function keypicker:SetDisabled(disabled)
+			self.Disabled = disabled == true
+			self.Button.Active = not self.Disabled
+			self:_refreshButton()
+		end
+
+		function keypicker:SetKey(value, setOptions)
+			setOptions = setOptions or {}
+			local normalized = normalizeKeyValue(value)
+			local changed = normalized ~= self.Value
+			self.Value = normalized
+			self.Capturing = false
+			self:_refreshButton()
+
+			if changed and setOptions.Silent ~= true then
+				safeCallback(self.ChangedCallback, self.Value)
+				self.ChangedSignal:Fire(self.Value)
+			end
+
+			return self.Value
+		end
+
+		function keypicker:GetKey()
+			return self.Value
+		end
+
+		function keypicker:OnChanged(callback)
+			local connection = self.ChangedSignal:Connect(callback)
+			safeCallback(callback, self.Value)
+			return connection
+		end
+
+		function keypicker:OnTriggered(callback)
+			return self.TriggeredSignal:Connect(callback)
+		end
+
+		function keypicker:_activate(input)
+			safeCallback(self.Callback, self.Value, input)
+			self.TriggeredSignal:Fire(self.Value, input)
+		end
+
+		keypicker.Button.MouseButton1Click:Connect(function()
+			if keypicker.Disabled or control.Disabled then
+				return
+			end
+
+			keypicker.Capturing = true
+			keypicker:_refreshButton()
+		end)
+
+		registerCleanup(self, UserInputService.InputBegan:Connect(function(input, processed)
+			if processed then
+				return
+			end
+
+			if keypicker.Capturing then
+				if input.UserInputType == Enum.UserInputType.Keyboard then
+					if input.KeyCode == Enum.KeyCode.Unknown then
+						return
+					end
+
+					if input.KeyCode == Enum.KeyCode.Escape or input.KeyCode == Enum.KeyCode.Backspace or input.KeyCode == Enum.KeyCode.Delete then
+						keypicker:SetKey("None")
+						return
+					end
+
+					keypicker:SetKey(input.KeyCode.Name)
+					return
+				elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+					keypicker:SetKey("MB1")
+					return
+				elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+					keypicker:SetKey("MB2")
+					return
+				elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+					keypicker:SetKey("MB3")
+					return
+				end
+
+				return
+			end
+
+			if keypicker.Disabled or control.Disabled or UserInputService:GetFocusedTextBox() then
+				return
+			end
+
+			if keyMatchesInput(keypicker.Value, input) then
+				keypicker:_activate(input)
+			end
+		end))
+
+		keypicker:SetDisabled(keypicker.Disabled)
+		table.insert(control.Tab.AccessoryControls, keypicker)
+		control.Keypicker = keypicker
+		return keypicker
+	end
+
+	function Window:_createColorpicker(control, options)
+		options = options or {}
+
+		local host = ensureAccessoryHost(control)
+		local initialColor = typeof(options.Default) == "Color3" and options.Default or COLORS.Accent
+		local colorpicker = {
+			Type = "Colorpicker",
+			Window = self,
+			Control = control,
+			Value = initialColor,
+			Alpha = tonumber(options.Alpha) or 0,
+			Disabled = options.Disabled == true,
+			Callback = options.Callback or options.ChangedCallback,
+			ChangedSignal = Toolkit.Signal.new(),
+		}
+
+		local hue, sat, val = Color3.toHSV(initialColor)
+		colorpicker.Hue = hue
+		colorpicker.Sat = sat
+		colorpicker.Val = val
+
+		colorpicker.Button = makeAccessoryButton(host, "Colorpicker", ColorpickerButtonSize)
+		colorpicker.Button.LayoutOrder = #host:GetChildren()
+		colorpicker.ButtonSwatch = Veil.Instance:Create("Frame", {
+			Name = "Swatch",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = initialColor,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			Size = UDim2.new(1, -6, 1, -6),
+			ZIndex = 11,
+			Parent = colorpicker.Button,
+		})
+		createCorner(colorpicker.ButtonSwatch, 4)
+		registerAccessory(control, ColorpickerButtonSize)
+
+		local pickerSurface = Axis:_ensurePickerSurface()
+		colorpicker.Popup = Veil.Instance:Create("Frame", {
+			Name = "AxisColorpickerPopup",
+			AutomaticSize = Enum.AutomaticSize.None,
+			BackgroundColor3 = COLORS.Window,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(PickerPopupWidth, PickerPopupHeight),
+			Visible = false,
+			ZIndex = 260,
+			Parent = pickerSurface,
+		})
+		createCorner(colorpicker.Popup, PickerCornerRadius)
+		createBorder(colorpicker.Popup)
+		createPadding(colorpicker.Popup, PickerPadding, PickerPadding, PickerPadding, PickerPadding)
+
+		colorpicker.PopupPreview = Veil.Instance:Create("Frame", {
+			Name = "Preview",
+			BackgroundColor3 = initialColor,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 0, PickerPreviewHeight),
+			ZIndex = 261,
+			Parent = colorpicker.Popup,
+		})
+		createCorner(colorpicker.PopupPreview, 6)
+
+		colorpicker.PopupPreviewLabel = Veil.Instance:Create("TextLabel", {
+			Name = "PreviewText",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Size = UDim2.fromScale(1, 1),
+			Text = "Color",
+			TextColor3 = COLORS.Text,
+			TextSize = 12,
+			TextTransparency = 0.15,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 262,
+			Parent = colorpicker.PopupPreview,
+		})
+
+		local pickerBody = Veil.Instance:Create("Frame", {
+			Name = "PickerBody",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(PickerPadding, PickerPadding + PickerPreviewHeight + 8),
+			Size = UDim2.new(1, -(PickerPadding * 2), 1, -(PickerPadding * 2) - PickerPreviewHeight - 8),
+			ZIndex = 261,
+			Parent = colorpicker.Popup,
+		})
+
+		colorpicker.Map = Veil.Instance:Create("Frame", {
+			Name = "SatValMap",
+			Active = true,
+			BackgroundColor3 = Color3.fromHSV(colorpicker.Hue, 1, 1),
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(PickerMapSize.X, PickerMapSize.Y),
+			ZIndex = 261,
+			Parent = pickerBody,
+		})
+		createCorner(colorpicker.Map, 6)
+		createBorder(colorpicker.Map)
+
+		Veil.Instance:Create("ImageLabel", {
+			Name = "SatOverlay",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Image = "rbxassetid://4155801252",
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 262,
+			Parent = colorpicker.Map,
+		})
+
+		colorpicker.MapHitbox = Veil.Instance:Create("TextButton", {
+			Name = "MapHitbox",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			Text = "",
+			ZIndex = 265,
+			Parent = colorpicker.Map,
+		})
+
+		colorpicker.MapCursorOuter = Veil.Instance:Create("Frame", {
+			Name = "MapCursorOuter",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = COLORS.Window,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(8, 8),
+			ZIndex = 263,
+			Parent = colorpicker.Map,
+		})
+		createCorner(colorpicker.MapCursorOuter, 8)
+
+		colorpicker.MapCursorInner = Veil.Instance:Create("Frame", {
+			Name = "MapCursorInner",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = COLORS.Text,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			Size = UDim2.fromOffset(4, 4),
+			ZIndex = 264,
+			Parent = colorpicker.MapCursorOuter,
+		})
+		createCorner(colorpicker.MapCursorInner, 4)
+
+		colorpicker.HueBar = Veil.Instance:Create("Frame", {
+			Name = "HueBar",
+			Active = true,
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BorderSizePixel = 0,
+			Position = UDim2.new(1, -PickerHueWidth, 0, 0),
+			Size = UDim2.fromOffset(PickerHueWidth, PickerMapSize.Y),
+			ZIndex = 261,
+			Parent = pickerBody,
+		})
+		createCorner(colorpicker.HueBar, 6)
+		createBorder(colorpicker.HueBar)
+
+		Veil.Instance:Create("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
+				ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+				ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+				ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 255)),
+				ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+				ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0)),
+			}),
+			Parent = colorpicker.HueBar,
+		})
+
+		colorpicker.HueHitbox = Veil.Instance:Create("TextButton", {
+			Name = "HueHitbox",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			Text = "",
+			ZIndex = 264,
+			Parent = colorpicker.HueBar,
+		})
+
+		colorpicker.HueCursor = Veil.Instance:Create("Frame", {
+			Name = "HueCursor",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = COLORS.Text,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0.5, 0, 0, 0),
+			Size = UDim2.new(1, 4, 0, 2),
+			ZIndex = 263,
+			Parent = colorpicker.HueBar,
+		})
+		createCorner(colorpicker.HueCursor, 2)
+
+		colorpicker.FooterLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Footer",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.Gotham,
+			Position = UDim2.fromOffset(PickerPadding, PickerPopupHeight - 24),
+			Size = UDim2.new(1, -(PickerPadding * 2), 0, 14),
+			Text = "Alpha support reserved",
+			TextColor3 = COLORS.Text,
+			TextSize = 11,
+			TextTransparency = 0.55,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 261,
+			Parent = colorpicker.Popup,
+		})
+
+		function colorpicker:_refreshVisuals()
+			local color = Color3.fromHSV(self.Hue, self.Sat, self.Val)
+			self.Value = color
+			self.ButtonSwatch.BackgroundColor3 = color
+			self.PopupPreview.BackgroundColor3 = color
+			self.Map.BackgroundColor3 = Color3.fromHSV(self.Hue, 1, 1)
+			self.MapCursorOuter.Position = UDim2.new(self.Sat, 0, 1 - self.Val, 0)
+			self.HueCursor.Position = UDim2.new(0.5, 0, self.Hue, 0)
+			self.Button.BackgroundTransparency = self.Disabled and 0.2 or 0
+		end
+
+		function colorpicker:SetDisabled(disabled)
+			self.Disabled = disabled == true
+			self.Button.Active = not self.Disabled
+			self:_refreshVisuals()
+			if self.Disabled and self.Popup.Visible then
+				self.Popup.Visible = false
+				Axis:_closeActivePicker()
+			end
+		end
+
+		function colorpicker:SetColor(value, setOptions)
+			setOptions = setOptions or {}
+			if typeof(value) ~= "Color3" then
+				return self.Value
+			end
+
+			local changed = self.Value ~= value
+			self.Hue, self.Sat, self.Val = Color3.toHSV(value)
+			self:_refreshVisuals()
+
+			if changed and setOptions.Silent ~= true then
+				safeCallback(self.Callback, self.Value)
+				self.ChangedSignal:Fire(self.Value)
+			end
+
+			return self.Value
+		end
+
+		function colorpicker:GetColor()
+			return self.Value
+		end
+
+		function colorpicker:OnChanged(callback)
+			local connection = self.ChangedSignal:Connect(callback)
+			safeCallback(callback, self.Value)
+			return connection
+		end
+
+		function colorpicker:_updateFromMap(inputPosition)
+			local mapPosition = self.Map.AbsolutePosition
+			local mapSize = self.Map.AbsoluteSize
+			if mapSize.X <= 0 or mapSize.Y <= 0 then
+				return
+			end
+
+			self.Sat = math.clamp((inputPosition.X - mapPosition.X) / mapSize.X, 0, 1)
+			self.Val = 1 - math.clamp((inputPosition.Y - mapPosition.Y) / mapSize.Y, 0, 1)
+			self:SetColor(Color3.fromHSV(self.Hue, self.Sat, self.Val))
+		end
+
+		function colorpicker:_updateFromHue(inputPosition)
+			local huePosition = self.HueBar.AbsolutePosition
+			local hueSize = self.HueBar.AbsoluteSize
+			if hueSize.Y <= 0 then
+				return
+			end
+
+			self.Hue = math.clamp((inputPosition.Y - huePosition.Y) / hueSize.Y, 0, 1)
+			self:SetColor(Color3.fromHSV(self.Hue, self.Sat, self.Val))
+		end
+
+		local dragTarget = nil
+
+		local function beginPopup()
+			if colorpicker.Disabled or control.Disabled then
+				return
+			end
+
+			Axis:_closeActivePicker(colorpicker.Popup)
+			Axis.ActivePickerPopup = colorpicker.Popup
+			colorpicker.Popup.Visible = true
+			colorpicker.Popup:SetAttribute("AxisOpen", true)
+			self:_positionPickerPopup(colorpicker.Button, colorpicker.Popup)
+			task.defer(function()
+				if colorpicker.Popup and colorpicker.Popup.Visible then
+					self:_positionPickerPopup(colorpicker.Button, colorpicker.Popup)
+				end
+			end)
+		end
+
+		colorpicker.Button.MouseButton1Click:Connect(function()
+			if colorpicker.Popup.Visible then
+				colorpicker.Popup.Visible = false
+				Axis:_closeActivePicker()
+				return
+			end
+
+			beginPopup()
+		end)
+
+		colorpicker.MapHitbox.InputBegan:Connect(function(input)
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
+			beginPopup()
+			dragTarget = "Map"
+			colorpicker:_updateFromMap(input.Position)
+		end)
+
+		colorpicker.HueHitbox.InputBegan:Connect(function(input)
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
+			beginPopup()
+			dragTarget = "Hue"
+			colorpicker:_updateFromHue(input.Position)
+		end)
+
+		registerCleanup(self, UserInputService.InputChanged:Connect(function(input)
+			if dragTarget == "Map" and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+				colorpicker:_updateFromMap(input.Position)
+			elseif dragTarget == "Hue" and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+				colorpicker:_updateFromHue(input.Position)
+			end
+		end))
+
+		registerCleanup(self, UserInputService.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				dragTarget = nil
+			end
+		end))
+
+		registerCleanup(self, UserInputService.InputBegan:Connect(function(input, processed)
+			if processed or not colorpicker.Popup.Visible then
+				return
+			end
+
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
+
+			local popupPos = colorpicker.Popup.AbsolutePosition
+			local popupSize = colorpicker.Popup.AbsoluteSize
+			local buttonPos = colorpicker.Button.AbsolutePosition
+			local buttonSize = colorpicker.Button.AbsoluteSize
+			local point = input.Position
+
+			local insidePopup = point.X >= popupPos.X and point.X <= popupPos.X + popupSize.X
+				and point.Y >= popupPos.Y and point.Y <= popupPos.Y + popupSize.Y
+			local insideButton = point.X >= buttonPos.X and point.X <= buttonPos.X + buttonSize.X
+				and point.Y >= buttonPos.Y and point.Y <= buttonPos.Y + buttonSize.Y
+
+			if not insidePopup and not insideButton then
+				colorpicker.Popup.Visible = false
+				Axis:_closeActivePicker()
+			end
+		end))
+
+		colorpicker:_refreshVisuals()
+		colorpicker:SetDisabled(colorpicker.Disabled)
+		table.insert(control.Tab.AccessoryControls, colorpicker)
+		control.Colorpicker = colorpicker
+		return colorpicker
+	end
+
 	function Window:_createToggle(tab, options)
 		options = options or {}
 
-		local parentColumn = resolveTabColumn(tab, options.Column or options.Side or "left")
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
 		ensureColumnStack(parentColumn)
 
 		local subtext = options.Subtext or options.Description or options.Desc
@@ -1422,6 +2425,7 @@ return function(Toolkit, Veil)
 		if defaultValue == nil then
 			defaultValue = options.Value
 		end
+		local rowHeight = hasSubtext and ToggleRowWithSubtextHeight or ToggleRowHeight
 
 		local toggle = {
 			Type = "Toggle",
@@ -1438,9 +2442,10 @@ return function(Toolkit, Veil)
 			Window = self,
 			Hovering = false,
 			Destroyed = false,
+			HasSubtext = hasSubtext,
+			RowHeight = rowHeight,
+			AccessoryWidth = 0,
 		}
-
-		local rowHeight = hasSubtext and ToggleRowWithSubtextHeight or ToggleRowHeight
 
 		toggle.Holder = Veil.Instance:Create("Frame", {
 			Name = toggle.Name,
@@ -1653,6 +2658,14 @@ return function(Toolkit, Veil)
 			return connection
 		end
 
+		function toggle:AddKeypicker(keypickerOptions)
+			return self.Window:_createKeypicker(self, keypickerOptions)
+		end
+
+		function toggle:AddColorpicker(colorpickerOptions)
+			return self.Window:_createColorpicker(self, colorpickerOptions)
+		end
+
 		toggle.Button.MouseButton1Click:Connect(function()
 			toggle:Toggle()
 		end)
@@ -1690,6 +2703,26 @@ return function(Toolkit, Veil)
 	end
 
 	Axis.Surface = Veil.GUI:CreateRoot("Axis")
+
+	function Axis:_ensurePickerSurface()
+		if self.PickerSurface then
+			return self.PickerSurface
+		end
+
+		self.PickerSurface = Veil.GUI:CreateSurface("AxisPickers")
+		return self.PickerSurface
+	end
+
+	function Axis:_closeActivePicker(exceptPopup)
+		local popup = self.ActivePickerPopup
+		if not popup or popup == exceptPopup then
+			return
+		end
+
+		self.ActivePickerPopup = nil
+		popup.Visible = false
+		popup:SetAttribute("AxisOpen", false)
+	end
 
 	function Axis:_ensureOverlaySurfaces()
 		if self.ToastSurface and self.NotificationSurface then
@@ -1832,8 +2865,14 @@ return function(Toolkit, Veil)
 			self.NotificationHosts = nil
 		end
 
+		if self.PickerSurface then
+			Veil.Instance:SecureDestroy(self.PickerSurface)
+			self.PickerSurface = nil
+		end
+
 		self.ActiveOverlays = nil
 		self._overlayOrder = nil
+		self.ActivePickerPopup = nil
 	end
 
 	return Axis

@@ -287,18 +287,65 @@ local steps = {
 				Icon = "house",
 			})
 
-			homeTab:CreateToggle({
+			homeTab.Columns.leftColumn:Label({
+				Text = "Example Label",
+			})
+
+			homeTab.Columns.leftColumn:Label({
+				Text = "Example Label",
+				Subtext = "With Subtext",
+			})
+
+			homeTab.Columns.leftColumn:Divider()
+			homeTab.Columns.leftColumn:SectionHeader("Section Header")
+
+			local exampleToggle = homeTab:CreateToggle({
 				Text = "Example Toggle",
 				Tooltip = "Example Tooltip",
 				Default = false,
 				Column = "left",
 			})
 
-			homeTab:CreateToggle({
+			local exampleToggleWithSubtext = homeTab:CreateToggle({
 				Text = "Example Toggle",
 				Subtext = "With Subtext",
 				Default = false,
 				Column = "left",
+			})
+
+			homeTab.Columns.middleColumn:SectionHeader("Text Elements")
+			homeTab.Columns.middleColumn:Label({
+				Text = "Static Label",
+			})
+			homeTab.Columns.middleColumn:Divider()
+			homeTab.Columns.middleColumn:Label({
+				Text = "Static Label",
+				Subtext = "Secondary description",
+			})
+
+			homeTab.Columns.rightColumn:SectionHeader("Picker Examples")
+
+			local labelWithKeypicker = homeTab.Columns.rightColumn:Label({
+				Text = "Example Label",
+			})
+			labelWithKeypicker:AddKeypicker({
+				Default = "E",
+			})
+
+			exampleToggle:AddKeypicker({
+				Default = "Q",
+			})
+
+			local labelWithColorpicker = homeTab.Columns.rightColumn:Label({
+				Text = "Example Label",
+				Subtext = "With Subtext",
+			})
+			labelWithColorpicker:AddColorpicker({
+				Default = Color3.fromRGB(242, 168, 190),
+			})
+
+			exampleToggleWithSubtext:AddColorpicker({
+				Default = Color3.fromRGB(90, 171, 255),
 			})
 
 			context.Axis:CreateTab({
