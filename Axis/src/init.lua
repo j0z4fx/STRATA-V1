@@ -2136,6 +2136,12 @@ return function(Toolkit, Veil)
 			if self.ModeMenu then
 				self.ModeMenu.Visible = false
 			end
+			if Axis.ActiveModeMenu == self.ModeMenu then
+				Axis.ActiveModeMenu = nil
+			end
+			if not Axis.ActivePickerPopup and Axis.PickerBackdrop then
+				Axis.PickerBackdrop.Visible = false
+			end
 		end
 
 		function keypicker:OpenModeMenu()
@@ -2143,7 +2149,12 @@ return function(Toolkit, Veil)
 				return
 			end
 
+			Axis:_closeActivePicker()
+			Axis.ActiveModeMenu = self.ModeMenu
 			self.ModeMenu.Visible = true
+			if Axis.PickerBackdrop then
+				Axis.PickerBackdrop.Visible = true
+			end
 			self.Window:_positionMenuPopup(self.Button, self.ModeMenu, KeypickerModeMenuWidth, getModeMenuHeight(#self.Modes))
 		end
 
@@ -2439,7 +2450,7 @@ return function(Toolkit, Veil)
 		createCorner(colorpicker.Map, 6)
 		createBorder(colorpicker.Map)
 
-		Veil.Instance:Create("ImageLabel", {
+		local satOverlay = Veil.Instance:Create("ImageLabel", {
 			Name = "SatOverlay",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
@@ -2448,6 +2459,7 @@ return function(Toolkit, Veil)
 			ZIndex = 262,
 			Parent = colorpicker.Map,
 		})
+		createCorner(satOverlay, 6)
 
 		colorpicker.MapHitbox = Veil.Instance:Create("TextButton", {
 			Name = "MapHitbox",
@@ -2634,6 +2646,9 @@ return function(Toolkit, Veil)
 			Axis.ActivePickerPopup = colorpicker.Popup
 			colorpicker.Popup.Visible = true
 			colorpicker.Popup:SetAttribute("AxisOpen", true)
+			if Axis.PickerBackdrop then
+				Axis.PickerBackdrop.Visible = true
+			end
 			self:_positionPickerPopup(colorpicker.Button, colorpicker.Popup)
 			task.defer(function()
 				if colorpicker.Popup and colorpicker.Popup.Visible then
@@ -3025,11 +3040,36 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			ClipsDescendants = false,
-			Interactable = false,
 			Size = UDim2.fromScale(1, 1),
 			ZIndex = 240,
 			Parent = self.Surface,
 		})
+
+		self.PickerBackdrop = Veil.Instance:Create("TextButton", {
+			Name = "AxisPickerBackdrop",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			Text = "",
+			Visible = false,
+			ZIndex = 242,
+			Parent = self.PickerSurface,
+		})
+
+		self.PickerBackdrop.MouseButton1Click:Connect(function()
+			if self.ActivePickerPopup then
+				self.ActivePickerPopup.Visible = false
+				self.ActivePickerPopup:SetAttribute("AxisOpen", false)
+				self.ActivePickerPopup = nil
+			end
+			if self.ActiveModeMenu then
+				self.ActiveModeMenu.Visible = false
+				self.ActiveModeMenu = nil
+			end
+			self.PickerBackdrop.Visible = false
+		end)
+
 		return self.PickerSurface
 	end
 
@@ -3042,6 +3082,10 @@ return function(Toolkit, Veil)
 		self.ActivePickerPopup = nil
 		popup.Visible = false
 		popup:SetAttribute("AxisOpen", false)
+
+		if not self.ActiveModeMenu and self.PickerBackdrop then
+			self.PickerBackdrop.Visible = false
+		end
 	end
 
 	function Axis:_ensureOverlaySurfaces()
@@ -3188,11 +3232,13 @@ return function(Toolkit, Veil)
 		if self.PickerSurface then
 			Veil.Instance:SecureDestroy(self.PickerSurface)
 			self.PickerSurface = nil
+			self.PickerBackdrop = nil
 		end
 
 		self.ActiveOverlays = nil
 		self._overlayOrder = nil
 		self.ActivePickerPopup = nil
+		self.ActiveModeMenu = nil
 	end
 
 	return Axis
