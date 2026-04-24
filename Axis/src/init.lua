@@ -12,6 +12,7 @@ return function(Toolkit, Veil)
 
 	local TextService = Veil.Services:Get("TextService")
 	local RunService = Veil.Services:Get("RunService")
+	local TweenService = Veil.Services:Get("TweenService")
 	local UserInputService = Veil.Services:Get("UserInputService")
 	local AccentTransparency = 0.9
 	local InactiveIconColor = Color3.fromRGB(68, 68, 78)
@@ -31,6 +32,12 @@ return function(Toolkit, Veil)
 	local ContentDividerHandleHeight = 28
 	local MinColumnWidth = 150
 	local ResizeSmoothness = 0.18
+	local OverlaySpacing = 10
+	local OverlayAnimationTime = 0.22
+	local OverlayCornerRadius = 12
+	local OverlayAccentLineWidth = 3
+	local ToastWidth = 320
+	local NotificationWidth = 340
 	local Lucide
 
 	local function loadLucide()
@@ -74,6 +81,80 @@ return function(Toolkit, Veil)
 	}
 
 	local STROKE_TRANSPARENCY = 0.935
+	local TOAST_LOCATIONS = {
+		TopCenter = {
+			Surface = "Toast",
+			Width = ToastWidth,
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 18),
+			HostSize = UDim2.new(0, 420, 1, -36),
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Top,
+			EnterOffset = Vector2.new(0, -14),
+			ExitOffset = Vector2.new(0, -14),
+		},
+		BottomCenter = {
+			Surface = "Toast",
+			Width = ToastWidth,
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -18),
+			HostSize = UDim2.new(0, 420, 1, -36),
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Bottom,
+			EnterOffset = Vector2.new(0, 14),
+			ExitOffset = Vector2.new(0, 14),
+		},
+	}
+	local NOTIFICATION_LOCATIONS = {
+		TopLeft = {
+			Surface = "Notification",
+			Width = NotificationWidth,
+			AnchorPoint = Vector2.new(0, 0),
+			Position = UDim2.fromOffset(18, 18),
+			HostSize = UDim2.new(0, 360, 1, -36),
+			HorizontalAlignment = Enum.HorizontalAlignment.Left,
+			VerticalAlignment = Enum.VerticalAlignment.Top,
+			EnterOffset = Vector2.new(-18, 0),
+			ExitOffset = Vector2.new(-18, 0),
+			Edge = "Left",
+		},
+		TopRight = {
+			Surface = "Notification",
+			Width = NotificationWidth,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -18, 0, 18),
+			HostSize = UDim2.new(0, 360, 1, -36),
+			HorizontalAlignment = Enum.HorizontalAlignment.Right,
+			VerticalAlignment = Enum.VerticalAlignment.Top,
+			EnterOffset = Vector2.new(18, 0),
+			ExitOffset = Vector2.new(18, 0),
+			Edge = "Right",
+		},
+		BottomLeft = {
+			Surface = "Notification",
+			Width = NotificationWidth,
+			AnchorPoint = Vector2.new(0, 1),
+			Position = UDim2.new(0, 18, 1, -18),
+			HostSize = UDim2.new(0, 360, 1, -36),
+			HorizontalAlignment = Enum.HorizontalAlignment.Left,
+			VerticalAlignment = Enum.VerticalAlignment.Bottom,
+			EnterOffset = Vector2.new(-18, 0),
+			ExitOffset = Vector2.new(-18, 0),
+			Edge = "Left",
+		},
+		BottomRight = {
+			Surface = "Notification",
+			Width = NotificationWidth,
+			AnchorPoint = Vector2.new(1, 1),
+			Position = UDim2.new(1, -18, 1, -18),
+			HostSize = UDim2.new(0, 360, 1, -36),
+			HorizontalAlignment = Enum.HorizontalAlignment.Right,
+			VerticalAlignment = Enum.VerticalAlignment.Bottom,
+			EnterOffset = Vector2.new(18, 0),
+			ExitOffset = Vector2.new(18, 0),
+			Edge = "Right",
+		},
+	}
 
 	local function measureText(text, size, font)
 		if not TextService then
@@ -99,6 +180,26 @@ return function(Toolkit, Veil)
 	local function createCorner(parent, radius)
 		return Veil.Instance:Create("UICorner", {
 			CornerRadius = UDim.new(0, radius),
+			Parent = parent,
+		})
+	end
+
+	local function createPadding(parent, top, right, bottom, left)
+		return Veil.Instance:Create("UIPadding", {
+			PaddingTop = UDim.new(0, top or 0),
+			PaddingRight = UDim.new(0, right or 0),
+			PaddingBottom = UDim.new(0, bottom or 0),
+			PaddingLeft = UDim.new(0, left or 0),
+			Parent = parent,
+		})
+	end
+
+	local function createBorder(parent)
+		return Veil.Instance:Create("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = COLORS.Stroke,
+			Transparency = STROKE_TRANSPARENCY,
+			Thickness = 1,
 			Parent = parent,
 		})
 	end
@@ -413,6 +514,194 @@ return function(Toolkit, Veil)
 		applyColumnLayout(tab)
 
 		return leftColumn, middleColumn, rightColumn
+	end
+
+	local function animateOverlayCard(card, targetOffset, onComplete)
+		local tween = TweenService:Create(card, TweenInfo.new(OverlayAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Position = UDim2.fromOffset(targetOffset.X, targetOffset.Y),
+		})
+
+		if onComplete then
+			local connection
+			connection = tween.Completed:Connect(function()
+				if connection then
+					connection:Disconnect()
+				end
+				onComplete()
+			end)
+		end
+
+		tween:Play()
+		return tween
+	end
+
+	local function createOverlayHost(surface, name, config)
+		local host = Veil.Instance:Create("Frame", {
+			Name = name,
+			Active = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ClipsDescendants = false,
+			Interactable = false,
+			AnchorPoint = config.AnchorPoint,
+			Position = config.Position,
+			Size = config.HostSize,
+			ZIndex = 200,
+			Parent = surface,
+		})
+
+		Veil.Instance:Create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Vertical,
+			HorizontalAlignment = config.HorizontalAlignment,
+			Padding = UDim.new(0, OverlaySpacing),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = config.VerticalAlignment,
+			Parent = host,
+		})
+
+		return host
+	end
+
+	local function createOverlayCard(host, width, layoutOrder, zIndex)
+		local wrapper = Veil.Instance:Create("Frame", {
+			Name = "OverlayWrapper",
+			Active = false,
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ClipsDescendants = false,
+			Interactable = false,
+			LayoutOrder = layoutOrder,
+			Size = UDim2.fromOffset(width, 0),
+			ZIndex = zIndex,
+			Parent = host,
+		})
+
+		local card = Veil.Instance:Create("Frame", {
+			Name = "OverlayCard",
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = COLORS.Window,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 0, 0),
+			ZIndex = zIndex,
+			Parent = wrapper,
+		})
+		createCorner(card, OverlayCornerRadius)
+		createBorder(card)
+
+		return wrapper, card
+	end
+
+	local function createOverlayTitle(parent, text, color, zIndex)
+		return Veil.Instance:Create("TextLabel", {
+			Name = "Title",
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Size = UDim2.new(1, 0, 0, 0),
+			Text = text,
+			TextColor3 = color,
+			TextSize = 14,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			ZIndex = zIndex,
+			Parent = parent,
+		})
+	end
+
+	local function createOverlayMessage(parent, text, zIndex)
+		return Veil.Instance:Create("TextLabel", {
+			Name = "Message",
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.Gotham,
+			Size = UDim2.new(1, 0, 0, 0),
+			Text = text,
+			TextColor3 = COLORS.Text,
+			TextSize = 13,
+			TextTransparency = 0.2,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			ZIndex = zIndex,
+			Parent = parent,
+		})
+	end
+
+	local function buildToastCard(card, accentColor, options, zIndex)
+		local content = Veil.Instance:Create("Frame", {
+			Name = "Content",
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 0, 0),
+			ZIndex = zIndex + 1,
+			Parent = card,
+		})
+		createPadding(content, 10, 12, 10, 12)
+
+		local layout = Veil.Instance:Create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Vertical,
+			Padding = UDim.new(0, 4),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Parent = content,
+		})
+
+		local titleText = options.Title
+		local messageText = options.Message or ""
+
+		if titleText and titleText ~= "" then
+			createOverlayTitle(content, titleText, accentColor, zIndex + 2)
+		end
+
+		if messageText ~= "" or not titleText or titleText == "" then
+			createOverlayMessage(content, messageText ~= "" and messageText or tostring(titleText or "Toast"), zIndex + 2)
+		end
+
+		return content, layout
+	end
+
+	local function buildNotificationCard(card, accentColor, edge, options, zIndex)
+		Veil.Instance:Create("Frame", {
+			Name = "AccentEdge",
+			BackgroundColor3 = accentColor,
+			BorderSizePixel = 0,
+			Position = edge == "Right" and UDim2.new(1, -OverlayAccentLineWidth, 0, 0) or UDim2.new(0, 0, 0, 0),
+			Size = UDim2.new(0, OverlayAccentLineWidth, 1, 0),
+			ZIndex = zIndex + 1,
+			Parent = card,
+		})
+
+		local content = Veil.Instance:Create("Frame", {
+			Name = "Content",
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 0, 0),
+			ZIndex = zIndex + 1,
+			Parent = card,
+		})
+		createPadding(content, 12, 14, 12, 14)
+
+		local layout = Veil.Instance:Create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Vertical,
+			Padding = UDim.new(0, 4),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Parent = content,
+		})
+
+		local titleText = options.Title or "Notification"
+		local messageText = options.Message or ""
+
+		createOverlayTitle(content, titleText, COLORS.Text, zIndex + 2)
+		if messageText ~= "" then
+			createOverlayMessage(content, messageText, zIndex + 2)
+		end
+
+		return content, layout
 	end
 
 	function Window.new(options)
@@ -826,6 +1115,96 @@ return function(Toolkit, Veil)
 
 	Axis.Surface = Veil.GUI:CreateRoot("Axis")
 
+	function Axis:_ensureOverlaySurfaces()
+		if self.ToastSurface and self.NotificationSurface then
+			return
+		end
+
+		self.ToastSurface = self.ToastSurface or Veil.GUI:CreateSurface("AxisToasts")
+		self.NotificationSurface = self.NotificationSurface or Veil.GUI:CreateSurface("AxisNotifications")
+		self.ToastHosts = self.ToastHosts or {}
+		self.NotificationHosts = self.NotificationHosts or {}
+		self.ActiveOverlays = self.ActiveOverlays or {}
+		self._overlayOrder = self._overlayOrder or 0
+
+		for location, config in pairs(TOAST_LOCATIONS) do
+			if not self.ToastHosts[location] then
+				self.ToastHosts[location] = createOverlayHost(self.ToastSurface, "Toast" .. location, config)
+			end
+		end
+
+		for location, config in pairs(NOTIFICATION_LOCATIONS) do
+			if not self.NotificationHosts[location] then
+				self.NotificationHosts[location] = createOverlayHost(self.NotificationSurface, "Notification" .. location, config)
+			end
+		end
+	end
+
+	function Axis:_destroyOverlayEntry(entry)
+		if not entry or entry.Destroyed then
+			return
+		end
+
+		entry.Destroyed = true
+		animateOverlayCard(entry.Card, entry.ExitOffset, function()
+			if entry.Wrapper then
+				Veil.Instance:SecureDestroy(entry.Wrapper)
+				entry.Wrapper = nil
+				entry.Card = nil
+			end
+		end)
+	end
+
+	function Axis:_createOverlay(kind, options)
+		options = options or {}
+		self:_ensureOverlaySurfaces()
+
+		local locations = kind == "Toast" and TOAST_LOCATIONS or NOTIFICATION_LOCATIONS
+		local defaultLocation = kind == "Toast" and "TopCenter" or "TopRight"
+		local locationKey = locations[options.Location] and options.Location or defaultLocation
+		local config = locations[locationKey]
+		local host = kind == "Toast" and self.ToastHosts[locationKey] or self.NotificationHosts[locationKey]
+		local accentColor = options.AccentColor or COLORS.Accent
+
+		self._overlayOrder = self._overlayOrder + 1
+
+		local wrapper, card = createOverlayCard(host, config.Width, self._overlayOrder, 210)
+		card.Position = UDim2.fromOffset(config.EnterOffset.X, config.EnterOffset.Y)
+
+		if kind == "Toast" then
+			buildToastCard(card, accentColor, options, 210)
+		else
+			buildNotificationCard(card, accentColor, config.Edge, options, 210)
+		end
+
+		local entry = {
+			Card = card,
+			Wrapper = wrapper,
+			ExitOffset = config.ExitOffset,
+			Destroyed = false,
+			Id = Toolkit.Util.GenerateId(kind),
+		}
+
+		self.ActiveOverlays[entry.Id] = entry
+
+		task.defer(function()
+			if entry.Destroyed or not entry.Card then
+				return
+			end
+
+			animateOverlayCard(entry.Card, Vector2.zero)
+		end)
+
+		task.delay(math.max(0.5, tonumber(options.Duration) or (kind == "Toast" and 3.5 or 5)), function()
+			if self.ActiveOverlays then
+				self.ActiveOverlays[entry.Id] = nil
+			end
+			self:_destroyOverlayEntry(entry)
+		end)
+
+		return entry
+	end
+
 	function Axis:CreateWindow(options)
 		local window = Window.new(options)
 		table.insert(self.Windows, window)
@@ -838,12 +1217,44 @@ return function(Toolkit, Veil)
 		return self.ActiveWindow:CreateTab(options)
 	end
 
+	function Axis:Toast(options)
+		return self:_createOverlay("Toast", options)
+	end
+
+	function Axis:Notify(options)
+		return self:_createOverlay("Notification", options)
+	end
+
 	function Axis:DestroyAll()
+		if self.ActiveOverlays then
+			for id, entry in pairs(self.ActiveOverlays) do
+				self.ActiveOverlays[id] = nil
+				if entry and not entry.Destroyed and entry.Wrapper then
+					Veil.Instance:SecureDestroy(entry.Wrapper)
+				end
+			end
+		end
+
 		for _, window in ipairs(self.Windows) do
 			window:Destroy()
 		end
 
 		table.clear(self.Windows)
+
+		if self.ToastSurface then
+			Veil.Instance:SecureDestroy(self.ToastSurface)
+			self.ToastSurface = nil
+			self.ToastHosts = nil
+		end
+
+		if self.NotificationSurface then
+			Veil.Instance:SecureDestroy(self.NotificationSurface)
+			self.NotificationSurface = nil
+			self.NotificationHosts = nil
+		end
+
+		self.ActiveOverlays = nil
+		self._overlayOrder = nil
 	end
 
 	return Axis
