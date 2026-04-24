@@ -207,11 +207,15 @@ return function(Toolkit, Veil)
 			Parent = self.Titlebar,
 		})
 
-		createCorner(self.StatusChip, 4)
+		Veil.Instance:Create("UICorner", {
+			CornerRadius = UDim.new(1, 0),
+			Parent = self.StatusChip,
+		})
 
 		self.Body = Veil.Instance:Create("Frame", {
 			Name = "Body",
 			BackgroundColor3 = COLORS.Window,
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(0, 40),
 			Size = UDim2.new(1, 0, 1, -40),
@@ -231,6 +235,7 @@ return function(Toolkit, Veil)
 		self.Content = Veil.Instance:Create("Frame", {
 			Name = "Content",
 			BackgroundColor3 = COLORS.Window,
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(42, 0),
 			Size = UDim2.new(1, -42, 1, 0),
