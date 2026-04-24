@@ -161,24 +161,42 @@ end
 local context = {}
 local steps = {
 	{
-		Text = "Loading Toolkit",
-		Percent = 12,
+		Text = "Loading Toolkit...",
 		Error = "[Strata Loader] Failed to load Toolkit",
 		Run = function()
 			context.Toolkit = loadstring(game:HttpGet(TOOLKIT_URL))()
 		end,
 	},
 	{
-		Text = "Loading Veil",
-		Percent = 32,
+		Text = "Toolkit: resolving services",
+	},
+	{
+		Text = "Toolkit: initializing connections",
+	},
+	{
+		Text = "Toolkit: ready",
+	},
+	{
+		Text = "Loading Veil...",
 		Error = "[Strata Loader] Failed to load Veil",
 		Run = function()
 			context.Veil = loadstring(game:HttpGet(VEIL_URL))()(context.Toolkit)
 		end,
 	},
 	{
-		Text = "Loading Axis",
-		Percent = 52,
+		Text = "Veil: initializing protection",
+	},
+	{
+		Text = "Veil: binding environment",
+	},
+	{
+		Text = "Veil: securing interfaces",
+	},
+	{
+		Text = "Veil: ready",
+	},
+	{
+		Text = "Loading Axis...",
 		Error = "[Strata Loader] Failed to load Axis",
 		Run = function()
 			context.Axis = loadstring(game:HttpGet(AXIS_URL))()(context.Toolkit, context.Veil)
@@ -189,16 +207,17 @@ local steps = {
 		end,
 	},
 	{
-		Text = "Initializing Axis shell",
-		Percent = 72,
+		Text = "Axis: building interface",
 		Error = "[Strata Loader] Failed to initialize Axis shell",
 		Run = function()
 			context.Axis:CreateWindow({})
 		end,
 	},
 	{
-		Text = "Initializing tabs and settings",
-		Percent = 90,
+		Text = "Axis: constructing layout",
+	},
+	{
+		Text = "Axis: registering tabs",
 		Error = "[Strata Loader] Failed to initialize tabs",
 		Run = function()
 			context.Axis:CreateTab({
@@ -220,8 +239,13 @@ local steps = {
 		end,
 	},
 	{
-		Text = "Showing main UI",
-		Percent = 100,
+		Text = "Axis: ready",
+	},
+	{
+		Text = "Finalizing...",
+	},
+	{
+		Text = "Launching Strata",
 		Error = "[Strata Loader] Failed to show main UI",
 		Run = function()
 			if context.Axis and context.Axis.Surface and context.Axis.Surface:IsA("ScreenGui") then
@@ -233,11 +257,16 @@ local steps = {
 
 local perStepDelay = TotalFakeDelay / #steps
 
-for _, step in ipairs(steps) do
-	updateLoader(step.Text, step.Percent)
+for index, step in ipairs(steps) do
+	local percent = (index / #steps) * 100
+	updateLoader(step.Text, percent)
 	task.wait(perStepDelay)
 
-	local ok = pcall(step.Run)
+	local ok = true
+	if type(step.Run) == "function" then
+		ok = pcall(step.Run)
+	end
+
 	if not ok then
 		failLoader(step.Error)
 	end
