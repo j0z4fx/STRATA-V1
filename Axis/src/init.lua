@@ -14,8 +14,11 @@ return function(Toolkit, Veil)
 	local AccentTransparency = 0.9
 	local InactiveIconColor = Color3.fromRGB(68, 68, 78)
 	local SidebarInset = 6
-	local TabButtonSize = 30
-	local SidebarWidth = 42
+	local TabButtonSize = 36
+	local TabCornerRadius = 7
+	local TabIconInset = 4
+	local TabSpacing = 8
+	local SidebarWidth = 50
 	local Lucide
 
 	local function loadLucide()
@@ -361,7 +364,7 @@ return function(Toolkit, Veil)
 		Veil.Instance:Create("UIListLayout", {
 			FillDirection = Enum.FillDirection.Vertical,
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0, 6),
+			Padding = UDim.new(0, TabSpacing),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Parent = self.TabList,
 		})
@@ -452,7 +455,7 @@ return function(Toolkit, Veil)
 			ZIndex = 5,
 			Parent = tab.Button,
 		})
-		createCorner(tab.Highlight, 6)
+		createCorner(tab.Highlight, TabCornerRadius)
 
 		tab.IconImage = Veil.Instance:Create("ImageLabel", {
 			Name = "IconImage",
@@ -460,8 +463,8 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Image = "",
 			ImageColor3 = InactiveIconColor,
-			Position = UDim2.fromOffset(3, 3),
-			Size = UDim2.fromOffset(24, 24),
+			Position = UDim2.fromOffset(TabIconInset, TabIconInset),
+			Size = UDim2.fromOffset(TabButtonSize - (TabIconInset * 2), TabButtonSize - (TabIconInset * 2)),
 			ZIndex = 6,
 			Visible = false,
 			Parent = tab.Button,
