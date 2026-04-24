@@ -281,19 +281,17 @@ local steps = {
 			local right = homeTab.Columns.rightColumn
 
 			left:SectionHeader("Toggles")
-
-			local toggle = homeTab:CreateToggle({
+			
+			local toggle = left:CreateToggle({
 				Text = "Example Toggle",
 				Tooltip = "Example Tooltip",
 				Default = false,
-				Column = "left",
 			})
-
-			local toggleWithSubtext = homeTab:CreateToggle({
+			
+			local toggleWithSubtext = left:CreateToggle({
 				Text = "Example Toggle",
 				Subtext = "With Subtext",
 				Default = false,
-				Column = "left",
 			})
 
 			left:SectionHeader("Labels")
