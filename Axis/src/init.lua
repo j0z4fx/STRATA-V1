@@ -90,11 +90,14 @@ return function(Toolkit, Veil)
 	local DropdownRowHeight = 30
 	local DropdownItemHeight = 26
 	local DropdownPanelPadding = 4
-	local DropdownPanelWidth = 200
+	local DropdownPanelWidth = 160
+	local DropdownValueWidth = 68
 	local DropdownCornerRadius = 8
 	local DropdownItemSpacing = 2
 	local DropdownMaxVisibleItems = 7
 	local DropdownPanelGap = 4
+	local DropdownAnimTime = 0.16
+	local DropdownAnimSlide = 6
 	local Lucide
 
 	local function loadLucide()
@@ -3294,7 +3297,7 @@ return function(Toolkit, Veil)
 			Parent = dropdown.Holder,
 		})
 
-		local rightReserved = 90
+		local rightReserved = DropdownValueWidth + 8
 
 		dropdown.LabelWrap = Veil.Instance:Create("Frame", {
 			Name = "LabelWrap",
@@ -3323,41 +3326,40 @@ return function(Toolkit, Veil)
 			Parent = dropdown.LabelWrap,
 		})
 
-		dropdown.ValueLabel = Veil.Instance:Create("TextLabel", {
-			Name = "Value",
+		dropdown.ValueBadge = Veil.Instance:Create("Frame", {
+			Name = "ValueBadge",
 			AnchorPoint = Vector2.new(1, 0.5),
-			BackgroundTransparency = 1,
+			BackgroundColor3 = COLORS.ToggleOffBackground,
 			BorderSizePixel = 0,
-			Font = Enum.Font.GothamMedium,
-			Position = UDim2.new(1, -16, 0.5, 0),
-			Size = UDim2.fromOffset(rightReserved - 24, 18),
-			Text = tostring(dropdown.Value or ""),
-			TextColor3 = COLORS.Text,
-			TextSize = 12,
-			TextTransparency = 0.35,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			TextXAlignment = Enum.TextXAlignment.Right,
-			TextYAlignment = Enum.TextYAlignment.Center,
+			Position = UDim2.new(1, 0, 0.5, 0),
+			Size = UDim2.fromOffset(DropdownValueWidth, AccessoryButtonHeight),
 			ZIndex = 5,
 			Parent = dropdown.Holder,
 		})
+		createCorner(dropdown.ValueBadge, 6)
+		Veil.Instance:Create("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = COLORS.Stroke,
+			Transparency = STROKE_TRANSPARENCY,
+			Thickness = 1,
+			Parent = dropdown.ValueBadge,
+		})
 
-		dropdown.Chevron = Veil.Instance:Create("TextLabel", {
-			Name = "Chevron",
-			AnchorPoint = Vector2.new(1, 0.5),
+		dropdown.ValueLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Value",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = UDim2.new(1, 0, 0.5, 0),
-			Size = UDim2.fromOffset(14, 18),
-			Text = "›",
+			Size = UDim2.fromScale(1, 1),
+			Text = tostring(dropdown.Value or ""),
 			TextColor3 = COLORS.Text,
-			TextSize = 16,
-			TextTransparency = 0.5,
+			TextSize = 11,
+			TextTransparency = 0.12,
+			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextYAlignment = Enum.TextYAlignment.Center,
-			ZIndex = 5,
-			Parent = dropdown.Holder,
+			ZIndex = 6,
+			Parent = dropdown.ValueBadge,
 		})
 
 		local pickerSurface = Axis:_ensurePickerSurface()
@@ -3372,7 +3374,7 @@ return function(Toolkit, Veil)
 			Parent = pickerSurface,
 		})
 		createCorner(dropdown.Panel, DropdownCornerRadius)
-		createBorder(dropdown.Panel)
+		dropdown.PanelBorder = createBorder(dropdown.Panel)
 		createPadding(dropdown.Panel, DropdownPanelPadding, DropdownPanelPadding, DropdownPanelPadding, DropdownPanelPadding)
 
 		dropdown.ItemList = Veil.Instance:Create("ScrollingFrame", {
@@ -3444,17 +3446,33 @@ return function(Toolkit, Veil)
 			if self.Disabled then return end
 			Axis:_closeActivePicker(self.Panel)
 			Axis.ActivePickerPopup = self.Panel
+			self.Panel.BackgroundTransparency = 1
+			if self.PanelBorder then self.PanelBorder.Transparency = 1 end
 			self.Panel.Position = UDim2.fromOffset(-4000, -4000)
 			self.Panel.Visible = true
 			self.Panel:SetAttribute("AxisOpen", true)
 			if Axis.PickerBackdrop then
 				Axis.PickerBackdrop.Visible = true
 			end
-			local h = computePanelHeight()
 			task.spawn(function()
 				task.wait()
-				if self.Panel and self.Panel.Visible then
-					self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
+				if not self.Panel or not self.Panel.Visible then return end
+				local h = computePanelHeight()
+				self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
+				local finalPos = self.Panel.Position
+				self.Panel.Position = UDim2.fromOffset(
+					finalPos.X.Offset,
+					finalPos.Y.Offset - DropdownAnimSlide
+				)
+				local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				TweenService:Create(self.Panel, tweenInfo, {
+					BackgroundTransparency = 0,
+					Position = finalPos,
+				}):Play()
+				if self.PanelBorder then
+					TweenService:Create(self.PanelBorder, tweenInfo, {
+						Transparency = STROKE_TRANSPARENCY,
+					}):Play()
 				end
 			end)
 		end
