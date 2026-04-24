@@ -66,7 +66,7 @@ return function(Toolkit, Veil)
 	local KeypickerMinWidth = 28
 	local ColorpickerButtonSize = 20
 	local PickerPopupWidth = 186
-	local PickerPopupHeight = 188
+	local PickerPopupHeight = 194
 	local PickerPadding = 10
 	local PickerMapSize = Vector2.new(122, 122)
 	local PickerHueWidth = 12
@@ -2421,8 +2421,8 @@ return function(Toolkit, Veil)
 			Name = "PickerBody",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(PickerPadding, PickerPadding + PickerPreviewHeight + 8),
-			Size = UDim2.new(1, -(PickerPadding * 2), 0, pickerBodyHeight),
+			Position = UDim2.fromOffset(0, PickerPreviewHeight + 8),
+			Size = UDim2.new(1, 0, 0, pickerBodyHeight),
 			ZIndex = 261,
 			Parent = colorpicker.Popup,
 		})
@@ -2432,7 +2432,7 @@ return function(Toolkit, Veil)
 			Active = true,
 			BackgroundColor3 = Color3.fromHSV(colorpicker.Hue, 1, 1),
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(PickerMapSize.X, PickerMapSize.Y),
+			Size = UDim2.new(1, -PickerHueWidth - 8, 0, PickerMapSize.Y),
 			ZIndex = 261,
 			Parent = pickerBody,
 		})
@@ -2538,8 +2538,8 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.Gotham,
-			Position = UDim2.fromOffset(PickerPadding, PickerPadding + PickerPreviewHeight + 8 + pickerBodyHeight + 8),
-			Size = UDim2.new(1, -(PickerPadding * 2), 0, 14),
+			Position = UDim2.fromOffset(0, PickerPreviewHeight + 8 + pickerBodyHeight + 8),
+			Size = UDim2.new(1, 0, 0, 14),
 			Text = "Alpha support reserved",
 			TextColor3 = COLORS.Text,
 			TextSize = 11,
@@ -2660,7 +2660,6 @@ return function(Toolkit, Veil)
 			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
 				return
 			end
-			beginPopup()
 			dragTarget = "Map"
 			colorpicker:_updateFromMap(input.Position)
 		end)
@@ -2669,7 +2668,6 @@ return function(Toolkit, Veil)
 			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
 				return
 			end
-			beginPopup()
 			dragTarget = "Hue"
 			colorpicker:_updateFromHue(input.Position)
 		end)
