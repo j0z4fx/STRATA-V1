@@ -11,6 +11,40 @@ return function(Toolkit, Veil)
 	}
 
 	local TextService = Veil.Services:Get("TextService")
+	local AccentTransparency = 0.9
+	local InactiveIconColor = Color3.fromRGB(68, 68, 78)
+	local SidebarInset = 6
+	local TabButtonSize = 30
+	local SidebarWidth = 42
+	local Lucide
+
+	local function loadLucide()
+		if Lucide ~= nil then
+			return Lucide
+		end
+
+		local success, source = pcall(game.HttpGet, game, "https://raw.githubusercontent.com/notpoiu/lucide-roblox-direct/main/source.lua")
+		if not success or type(source) ~= "string" then
+			Lucide = false
+			return nil
+		end
+
+		local compiled, compileError = loadstring(source)
+		if type(compiled) ~= "function" then
+			warn("[Axis] Failed to compile lucide-roblox-direct", compileError)
+			Lucide = false
+			return nil
+		end
+
+		local ok, module = pcall(compiled)
+		if ok and type(module) == "table" then
+			Lucide = module
+			return Lucide
+		end
+
+		Lucide = false
+		return nil
+	end
 
 	local Window = {}
 	Window.__index = Window
@@ -135,6 +169,69 @@ return function(Toolkit, Veil)
 		return shell
 	end
 
+	local function applyLucideAsset(imageLabel, iconName, tintColor)
+		local lucide = loadLucide()
+		if not lucide or type(lucide.GetAsset) ~= "function" then
+			return false
+		end
+
+		local success, asset = pcall(lucide.GetAsset, iconName)
+		if not success or type(asset) ~= "table" then
+			return false
+		end
+
+		imageLabel.Image = asset.Url or ""
+		imageLabel.ImageRectSize = asset.ImageRectSize or Vector2.zero
+		imageLabel.ImageRectOffset = asset.ImageRectOffset or Vector2.zero
+		imageLabel.ImageColor3 = tintColor
+		imageLabel.Visible = true
+
+		return true
+	end
+
+	local function setTabButtonVisual(tab, isSelected, colors)
+		local tint = isSelected and colors.Accent or InactiveIconColor
+		tab.Highlight.BackgroundTransparency = isSelected and AccentTransparency or 1
+
+		if tab.IconImage.Visible then
+			tab.IconImage.ImageColor3 = tint
+		end
+
+		if tab.IconFallback.Visible then
+			tab.IconFallback.TextColor3 = tint
+		end
+	end
+
+	local function createColumns(parent)
+		local leftColumn = Veil.Instance:Create("Frame", {
+			Name = "leftColumn",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1 / 3, 0, 1, 0),
+			Parent = parent,
+		})
+
+		local middleColumn = Veil.Instance:Create("Frame", {
+			Name = "middleColumn",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.new(1 / 3, 0, 0, 0),
+			Size = UDim2.new(1 / 3, 0, 1, 0),
+			Parent = parent,
+		})
+
+		local rightColumn = Veil.Instance:Create("Frame", {
+			Name = "rightColumn",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.new(2 / 3, 0, 0, 0),
+			Size = UDim2.new(1 / 3, 0, 1, 0),
+			Parent = parent,
+		})
+
+		return leftColumn, middleColumn, rightColumn
+	end
+
 	function Window.new(options)
 		options = options or {}
 
@@ -144,6 +241,8 @@ return function(Toolkit, Veil)
 		self.Surface = Axis.Surface
 		self.Id = Toolkit.Util.GenerateId("AxisWindow")
 		self.State = Toolkit.State:Scope(self.Id)
+		self.Tabs = {}
+		self.SelectedTab = nil
 
 		self.Frame = Veil.Instance:Create("Frame", {
 			Name = "Window",
@@ -242,21 +341,48 @@ return function(Toolkit, Veil)
 			Name = "Sidebar",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.new(0, 42, 1, 0),
+			Size = UDim2.new(0, SidebarWidth, 1, 0),
 			ZIndex = 2,
 			Parent = self.Body,
 		})
 
 		self.SidebarShell = buildSidebarShell(self.Sidebar)
 
+		self.TabList = Veil.Instance:Create("Frame", {
+			Name = "TabList",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(SidebarInset, SidebarInset),
+			Size = UDim2.new(1, -(SidebarInset * 2), 1, -(SidebarInset * 2)),
+			ZIndex = 4,
+			Parent = self.Sidebar,
+		})
+
+		Veil.Instance:Create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Vertical,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			Padding = UDim.new(0, 6),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Parent = self.TabList,
+		})
+
 		self.Content = Veil.Instance:Create("Frame", {
 			Name = "Content",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(42, 0),
-			Size = UDim2.new(1, -42, 1, 0),
+			Position = UDim2.fromOffset(SidebarWidth, 0),
+			Size = UDim2.new(1, -SidebarWidth, 1, 0),
 			ZIndex = 2,
 			Parent = self.Body,
+		})
+
+		self.TabContentHost = Veil.Instance:Create("Frame", {
+			Name = "TabContentHost",
+			BackgroundColor3 = COLORS.Window,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 2,
+			Parent = self.Content,
 		})
 
 		self.DragBinding = Toolkit.Drag:AttachSmooth(self.Titlebar, self.Frame, {
@@ -279,12 +405,127 @@ return function(Toolkit, Veil)
 		end
 	end
 
+	function Window:SelectTab(tab)
+		if not tab or self.SelectedTab == tab then
+			return tab
+		end
+
+		for _, entry in ipairs(self.Tabs) do
+			local isSelected = entry == tab
+			entry.Content.Visible = isSelected
+			setTabButtonVisual(entry, isSelected, COLORS)
+			if isSelected then
+				self.SelectedTab = entry
+			end
+		end
+
+		return self.SelectedTab
+	end
+
+	function Window:CreateTab(options)
+		options = options or {}
+
+		local tab = {
+			Name = options.Name or string.format("Tab %d", #self.Tabs + 1),
+			Icon = options.Icon or "square",
+			Order = #self.Tabs + 1,
+		}
+
+		tab.Button = Veil.Instance:Create("TextButton", {
+			Name = tab.Name .. "TabButton",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			LayoutOrder = tab.Order,
+			Size = UDim2.fromOffset(TabButtonSize, TabButtonSize),
+			Text = "",
+			ZIndex = 5,
+			Parent = self.TabList,
+		})
+
+		tab.Highlight = Veil.Instance:Create("Frame", {
+			Name = "Highlight",
+			BackgroundColor3 = COLORS.Accent,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(TabButtonSize, TabButtonSize),
+			ZIndex = 5,
+			Parent = tab.Button,
+		})
+		createCorner(tab.Highlight, 6)
+
+		tab.IconImage = Veil.Instance:Create("ImageLabel", {
+			Name = "IconImage",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Image = "",
+			ImageColor3 = InactiveIconColor,
+			Position = UDim2.fromOffset(3, 3),
+			Size = UDim2.fromOffset(24, 24),
+			ZIndex = 6,
+			Visible = false,
+			Parent = tab.Button,
+		})
+
+		tab.IconFallback = Veil.Instance:Create("TextLabel", {
+			Name = "IconFallback",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.fromOffset(0, 0),
+			Size = UDim2.fromOffset(TabButtonSize, TabButtonSize),
+			Text = string.upper(string.sub(tab.Name, 1, 1)),
+			TextColor3 = InactiveIconColor,
+			TextSize = 12,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 6,
+			Visible = true,
+			Parent = tab.Button,
+		})
+
+		if applyLucideAsset(tab.IconImage, tab.Icon, InactiveIconColor) then
+			tab.IconFallback.Visible = false
+		end
+
+		tab.Content = Veil.Instance:Create("Frame", {
+			Name = tab.Name .. "Content",
+			BackgroundColor3 = COLORS.Window,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			Visible = false,
+			ZIndex = 2,
+			Parent = self.TabContentHost,
+		})
+
+		tab.leftColumn, tab.middleColumn, tab.rightColumn = createColumns(tab.Content)
+
+		tab.Button.MouseButton1Click:Connect(function()
+			self:SelectTab(tab)
+		end)
+
+		table.insert(self.Tabs, tab)
+		setTabButtonVisual(tab, false, COLORS)
+
+		if not self.SelectedTab then
+			self:SelectTab(tab)
+		end
+
+		return tab
+	end
+
 	Axis.Surface = Veil.GUI:CreateRoot("Axis")
 
 	function Axis:CreateWindow(options)
 		local window = Window.new(options)
 		table.insert(self.Windows, window)
+		self.ActiveWindow = window
 		return window
+	end
+
+	function Axis:CreateTab(options)
+		assert(self.ActiveWindow, "[Axis] Create a window before creating tabs")
+		return self.ActiveWindow:CreateTab(options)
 	end
 
 	function Axis:DestroyAll()

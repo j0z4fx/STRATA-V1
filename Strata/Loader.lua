@@ -6,5 +6,22 @@ local Toolkit = loadstring(game:HttpGet(TOOLKIT_URL))()
 local Veil = loadstring(game:HttpGet(VEIL_URL))()(Toolkit)
 local Axis = loadstring(game:HttpGet(AXIS_URL))()(Toolkit, Veil)
 
-return Axis:CreateWindow({
+Axis:CreateWindow({
 })
+
+Axis:CreateTab({
+	Name = "Home",
+	Icon = "house",
+})
+
+Axis:CreateTab({
+	Name = "Settings",
+	Icon = "settings",
+})
+
+Axis:CreateTab({
+	Name = "Profile",
+	Icon = "user-round",
+})
+
+return Axis
