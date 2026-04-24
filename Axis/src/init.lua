@@ -11,7 +11,9 @@ return function(Toolkit, Veil)
 	}
 
 	local TextService = Veil.Services:Get("TextService")
+	local RunService = Veil.Services:Get("RunService")
 	local UserInputService = Veil.Services:Get("UserInputService")
+	local GuiService = Veil.Services:Get("GuiService")
 	local AccentTransparency = 0.9
 	local InactiveIconColor = Color3.fromRGB(68, 68, 78)
 	local SidebarInset = 6
@@ -29,6 +31,7 @@ return function(Toolkit, Veil)
 	local ContentDividerHandleWidth = 4
 	local ContentDividerHandleHeight = 28
 	local MinColumnWidth = 150
+	local ResizeSmoothness = 0.18
 	local Lucide
 
 	local function loadLucide()
@@ -226,6 +229,7 @@ return function(Toolkit, Veil)
 	local function createContentDivider(parent)
 		local divider = Veil.Instance:Create("Frame", {
 			Name = "ColumnDivider",
+			BackgroundColor3 = COLORS.Stroke,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Size = UDim2.new(0, ContentDividerGrabWidth, 1, -(ContentDividerPaddingY * 2)),
@@ -272,13 +276,28 @@ return function(Toolkit, Veil)
 		return divider, hitbox, line, handle
 	end
 
+	local function setDividerVisualState(layout, dividerIndex, isHeld)
+		local divider = layout.Dividers[dividerIndex]
+		local line = layout.Lines[dividerIndex]
+		local handle = layout.Handles[dividerIndex]
+		local color = isHeld and COLORS.Accent or COLORS.Stroke
+		local transparency = isHeld and 0.7 or STROKE_TRANSPARENCY
+
+		divider.BackgroundColor3 = color
+		divider.BackgroundTransparency = isHeld and 0.7 or 1
+		line.BackgroundColor3 = color
+		line.BackgroundTransparency = transparency
+		handle.BackgroundColor3 = color
+		handle.BackgroundTransparency = transparency
+	end
+
 	local function applyColumnLayout(tab)
 		if not tab.ColumnLayout then
 			return
 		end
 
 		local layout = tab.ColumnLayout
-		local boundaries = layout.Boundaries
+		local boundaries = layout.CurrentBoundaries or layout.Boundaries
 		local columns = layout.Columns
 		local columnCount = #columns
 
@@ -296,7 +315,6 @@ return function(Toolkit, Veil)
 
 	local function attachDividerResize(self, tab, dividerIndex)
 		local layout = tab.ColumnLayout
-		local divider = layout.Dividers[dividerIndex]
 		local hitbox = layout.Hitboxes[dividerIndex]
 
 		registerCleanup(self, hitbox.InputBegan:Connect(function(input)
@@ -305,10 +323,14 @@ return function(Toolkit, Veil)
 			end
 
 			layout.ActiveDivider = dividerIndex
+			setDividerVisualState(layout, dividerIndex, true)
 		end))
 
 		registerCleanup(self, UserInputService.InputEnded:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				if layout.ActiveDivider then
+					setDividerVisualState(layout, layout.ActiveDivider, false)
+				end
 				layout.ActiveDivider = nil
 			end
 		end))
@@ -330,13 +352,11 @@ return function(Toolkit, Veil)
 			local relativeX = input.Position.X - tab.Content.AbsolutePosition.X
 			local nextScale = relativeX / contentWidth
 			local minimumScale = math.clamp(MinColumnWidth / contentWidth, 0.08, 0.4)
-			local lowerBound = dividerIndex == 1 and minimumScale or (layout.Boundaries[dividerIndex - 1] + minimumScale)
-			local upperBound = dividerIndex == #layout.Boundaries and (1 - minimumScale) or (layout.Boundaries[dividerIndex + 1] - minimumScale)
-			layout.Boundaries[dividerIndex] = math.clamp(nextScale, lowerBound, upperBound)
-			applyColumnLayout(tab)
+			local currentTargets = layout.TargetBoundaries
+			local lowerBound = dividerIndex == 1 and minimumScale or (currentTargets[dividerIndex - 1] + minimumScale)
+			local upperBound = dividerIndex == #currentTargets and (1 - minimumScale) or (currentTargets[dividerIndex + 1] - minimumScale)
+			layout.TargetBoundaries[dividerIndex] = math.clamp(nextScale, lowerBound, upperBound)
 		end))
-
-		return divider
 	end
 
 	local function createColumns(self, tab, parent, columnMode)
@@ -374,14 +394,21 @@ return function(Toolkit, Veil)
 			Columns = columns,
 			Dividers = {},
 			Hitboxes = {},
+			Lines = {},
+			Handles = {},
 			Boundaries = columnMode == "Double" and { 0.5 } or { 1 / 3, 2 / 3 },
+			CurrentBoundaries = columnMode == "Double" and { 0.5 } or { 1 / 3, 2 / 3 },
+			TargetBoundaries = columnMode == "Double" and { 0.5 } or { 1 / 3, 2 / 3 },
 			ActiveDivider = nil,
 		}
 
 		for dividerIndex = 1, #tab.ColumnLayout.Boundaries do
-			local divider, hitbox = createContentDivider(parent)
+			local divider, hitbox, line, handle = createContentDivider(parent)
 			tab.ColumnLayout.Dividers[dividerIndex] = divider
 			tab.ColumnLayout.Hitboxes[dividerIndex] = hitbox
+			tab.ColumnLayout.Lines[dividerIndex] = line
+			tab.ColumnLayout.Handles[dividerIndex] = handle
+			setDividerVisualState(tab.ColumnLayout, dividerIndex, false)
 			attachDividerResize(self, tab, dividerIndex)
 		end
 
@@ -402,6 +429,7 @@ return function(Toolkit, Veil)
 		self.Tabs = {}
 		self.SelectedTab = nil
 		self.CleanupConnections = {}
+		self.CursorVisible = true
 
 		self.Frame = Veil.Instance:Create("Frame", {
 			Name = "Window",
@@ -572,9 +600,81 @@ return function(Toolkit, Veil)
 			Parent = self.Content,
 		})
 
+		self.CursorLayer = Veil.Instance:Create("Frame", {
+			Name = "CursorLayer",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 100,
+			Parent = self.Surface,
+		})
+
+		self.Cursor = Veil.Instance:Create("Frame", {
+			Name = "CrossCursor",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(17, 17),
+			ZIndex = 101,
+			Parent = self.CursorLayer,
+		})
+
+		local cursorParts = {
+			{ Name = "VerticalStroke", Size = UDim2.fromOffset(5, 17), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 101 },
+			{ Name = "HorizontalStroke", Size = UDim2.fromOffset(17, 5), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 101 },
+			{ Name = "VerticalFill", Size = UDim2.fromOffset(3, 15), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 102 },
+			{ Name = "HorizontalFill", Size = UDim2.fromOffset(15, 3), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 102 },
+		}
+
+		for _, part in ipairs(cursorParts) do
+			Veil.Instance:Create("Frame", {
+				Name = part.Name,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = part.Color,
+				BorderSizePixel = 0,
+				Position = part.Position,
+				Size = part.Size,
+				ZIndex = part.Z,
+				Parent = self.Cursor,
+			})
+		end
+
 		self.DragBinding = Toolkit.Drag:AttachSmooth(self.Titlebar, self.Frame, {
 			Smoothness = 0.15,
 		})
+		self.RenderBinding = RunService.RenderStepped:Connect(function()
+			local mouseLocation = UserInputService:GetMouseLocation()
+			local guiInset = GuiService:GetGuiInset()
+			local cursorX = mouseLocation.X - guiInset.X
+			local cursorY = mouseLocation.Y - guiInset.Y
+
+			if self.Cursor then
+				self.Cursor.Position = UDim2.fromOffset(cursorX, cursorY)
+				self.Cursor.Visible = self.CursorVisible
+			end
+
+			for _, tab in ipairs(self.Tabs) do
+				local layout = tab.ColumnLayout
+				if layout then
+					local dirty = false
+					for index, targetBoundary in ipairs(layout.TargetBoundaries) do
+						local currentBoundary = layout.CurrentBoundaries[index]
+						local nextBoundary = currentBoundary + ((targetBoundary - currentBoundary) * ResizeSmoothness)
+						if math.abs(targetBoundary - nextBoundary) < 0.0005 then
+							nextBoundary = targetBoundary
+						else
+							dirty = true
+						end
+						layout.CurrentBoundaries[index] = nextBoundary
+					end
+
+					if dirty or layout.ActiveDivider then
+						applyColumnLayout(tab)
+					end
+				end
+			end
+		end)
+		UserInputService.MouseIconEnabled = false
 		self.State:Set("Surface", self.Surface)
 
 		return self
@@ -594,10 +694,23 @@ return function(Toolkit, Veil)
 			self.DragBinding = nil
 		end
 
+		if self.RenderBinding then
+			self.RenderBinding:Disconnect()
+			self.RenderBinding = nil
+		end
+
 		if self.Frame then
 			Veil.Instance:SecureDestroy(self.Frame)
 			self.Frame = nil
 		end
+
+		if self.CursorLayer then
+			Veil.Instance:SecureDestroy(self.CursorLayer)
+			self.CursorLayer = nil
+			self.Cursor = nil
+		end
+
+		UserInputService.MouseIconEnabled = true
 	end
 
 	function Window:SelectTab(tab)
