@@ -388,11 +388,20 @@ local steps = {
 				Icon = "user-round",
 			})
 
-			context.Axis:CreateTab({
+			local settingsTab = context.Axis:CreateTab({
 				Name = "Settings",
 				Icon = "settings",
 				IconScale = 0.8,
 				PinnedBottom = true,
+			})
+
+			settingsTab.Columns.rightColumn:Dropdown({
+				Name = "Icon Pack",
+				Items = { "Lucide", "Phosphor" },
+				Default = "Phosphor",
+				Callback = function(value)
+					context.Axis:SetIconPack(value)
+				end,
 			})
 		end,
 	},

@@ -175,7 +175,9 @@ return function(Toolkit, Veil)
 		self.ActivePack = packName
 		for imageLabel, data in pairs(self.Registry) do
 			if imageLabel.Parent then
-				self:Apply(imageLabel, data.IconName, data.TintColor)
+				task.spawn(function()
+					self:Apply(imageLabel, data.IconName, data.TintColor)
+				end)
 			else
 				self.Registry[imageLabel] = nil
 			end
