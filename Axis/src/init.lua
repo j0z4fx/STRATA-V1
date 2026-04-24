@@ -140,7 +140,7 @@ return function(Toolkit, Veil)
 
 		local self = setmetatable({}, Window)
 		self.Title = "Strata"
-		self.StatusText = "Pre-Alpha"
+		self.StatusText = " Pre-Alpha "
 		self.Surface = Axis.Surface
 		self.Id = Toolkit.Util.GenerateId("AxisWindow")
 		self.State = Toolkit.State:Scope(self.Id)
