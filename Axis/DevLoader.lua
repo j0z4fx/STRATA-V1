@@ -63,6 +63,25 @@ left:Slider({
 	Subtext = "Camera smoothing amount",
 })
 
+local right = homeTab.Columns.rightColumn
+
+right:SectionHeader("Selection")
+
+right:Dropdown({
+	Name = "Render Quality",
+	Items = { "Low", "Medium", "High", "Ultra" },
+	Default = "High",
+	Callback = function(value)
+		print("Dropdown changed:", value)
+	end,
+})
+
+right:Dropdown({
+	Name = "Target Player",
+	Items = { "Player1", "Player2", "Player3", "Player4", "Player5", "Player6", "Player7", "Player8" },
+	Default = "Player1",
+})
+
 local middle = homeTab.Columns.middleColumn
 
 middle:SectionHeader("Notched")

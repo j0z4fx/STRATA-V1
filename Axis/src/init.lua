@@ -87,6 +87,13 @@ return function(Toolkit, Veil)
 	local SliderValueWidth = 38
 	local SliderLerpAlpha = 0.22
 	local SliderDragLerpAlpha = 0.42
+	local DropdownRowHeight = 30
+	local DropdownItemHeight = 26
+	local DropdownPanelPadding = 4
+	local DropdownCornerRadius = 8
+	local DropdownItemSpacing = 2
+	local DropdownMaxVisibleItems = 7
+	local DropdownPanelGap = 4
 	local Lucide
 
 	local function loadLucide()
@@ -1794,6 +1801,11 @@ return function(Toolkit, Veil)
 					elementOptions.ColumnFrame = columnApi.Frame
 					return columnApi.Window:_createRangeSlider(columnApi.Tab, elementOptions)
 				end,
+				Dropdown = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createDropdown(columnApi.Tab, elementOptions)
+				end,
 			}
 		end
 
@@ -1827,6 +1839,9 @@ return function(Toolkit, Veil)
 		end
 		function tab:RangeSlider(elementOptions)
 			return self.Window:_createRangeSlider(self, elementOptions)
+		end
+		function tab:Dropdown(elementOptions)
+			return self.Window:_createDropdown(self, elementOptions)
 		end
 
 		tab.Button.MouseButton1Click:Connect(function()
@@ -2054,6 +2069,26 @@ return function(Toolkit, Veil)
 		nextY = math.clamp(nextY, 10, math.max(10, viewportSize.Y - resolvedHeight - 10))
 
 		popup.Position = UDim2.fromOffset(nextX, nextY)
+	end
+
+	function Window:_positionDropdownPanel(holder, panel, panelHeight)
+		local viewportSize = getViewportSize()
+		local width = math.max(holder.AbsoluteSize.X, 60)
+		local anchorPos = holder.AbsolutePosition
+		local anchorSize = holder.AbsoluteSize
+		local belowY = anchorPos.Y + anchorSize.Y + DropdownPanelGap
+		local aboveY = anchorPos.Y - panelHeight - DropdownPanelGap
+		local nextX = math.clamp(anchorPos.X, 10, math.max(10, viewportSize.X - width - 10))
+		local nextY
+		if belowY + panelHeight <= viewportSize.Y - 10 then
+			nextY = belowY
+		elseif aboveY >= 10 then
+			nextY = aboveY
+		else
+			nextY = math.clamp(belowY, 10, math.max(10, viewportSize.Y - panelHeight - 10))
+		end
+		panel.Size = UDim2.fromOffset(width, panelHeight)
+		panel.Position = UDim2.fromOffset(nextX, nextY)
 	end
 
 	function Window:_createKeypicker(control, options)
@@ -3203,6 +3238,288 @@ return function(Toolkit, Veil)
 		end
 
 		return title, valueLabel, subtextLabel
+	end
+
+	-- ── Dropdown ─────────────────────────────────────────────────────────────
+
+	function Window:_createDropdown(tab, options)
+		options = options or {}
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local items = options.Items or options.Options or {}
+		local defaultValue = options.Default or options.Value
+		if defaultValue == nil and #items > 0 then
+			defaultValue = items[1]
+		end
+
+		local dropdown = {
+			Type = "Dropdown",
+			Name = options.Name or "Dropdown",
+			Text = options.Name or "Dropdown",
+			Value = defaultValue,
+			Items = items,
+			Disabled = options.Disabled == true,
+			Visible = options.Visible ~= false,
+			Callback = options.Callback,
+			ChangedSignal = Toolkit.Signal.new(),
+			Tab = tab,
+			Window = self,
+		}
+
+		dropdown.Holder = Veil.Instance:Create("Frame", {
+			Name = dropdown.Name,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			LayoutOrder = type(options.Order) == "number" and options.Order or 999,
+			Size = UDim2.new(1, 0, 0, DropdownRowHeight),
+			Visible = dropdown.Visible,
+			Parent = parentColumn,
+		})
+
+		dropdown.Button = Veil.Instance:Create("TextButton", {
+			Name = "Hitbox",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			Text = "",
+			ZIndex = 8,
+			Parent = dropdown.Holder,
+		})
+
+		local rightReserved = 90
+
+		dropdown.LabelWrap = Veil.Instance:Create("Frame", {
+			Name = "LabelWrap",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, -rightReserved, 1, 0),
+			ZIndex = 5,
+			Parent = dropdown.Holder,
+		})
+
+		dropdown.TitleLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Title",
+			AnchorPoint = Vector2.new(0, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.new(0, 0, 0.5, 0),
+			Size = UDim2.new(1, 0, 0, 18),
+			Text = dropdown.Text,
+			TextColor3 = COLORS.Text,
+			TextSize = 14,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 5,
+			Parent = dropdown.LabelWrap,
+		})
+
+		dropdown.ValueLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Value",
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.new(1, -16, 0.5, 0),
+			Size = UDim2.fromOffset(rightReserved - 24, 18),
+			Text = tostring(dropdown.Value or ""),
+			TextColor3 = COLORS.Text,
+			TextSize = 12,
+			TextTransparency = 0.35,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 5,
+			Parent = dropdown.Holder,
+		})
+
+		dropdown.Chevron = Veil.Instance:Create("TextLabel", {
+			Name = "Chevron",
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.new(1, 0, 0.5, 0),
+			Size = UDim2.fromOffset(14, 18),
+			Text = "›",
+			TextColor3 = COLORS.Text,
+			TextSize = 16,
+			TextTransparency = 0.5,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 5,
+			Parent = dropdown.Holder,
+		})
+
+		local pickerSurface = Axis:_ensurePickerSurface()
+
+		dropdown.Panel = Veil.Instance:Create("Frame", {
+			Name = "AxisDropdownPanel",
+			BackgroundColor3 = COLORS.Window,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(200, 100),
+			Visible = false,
+			ZIndex = 244,
+			Parent = pickerSurface,
+		})
+		createCorner(dropdown.Panel, DropdownCornerRadius)
+		createBorder(dropdown.Panel)
+		createPadding(dropdown.Panel, DropdownPanelPadding, DropdownPanelPadding, DropdownPanelPadding, DropdownPanelPadding)
+
+		dropdown.ItemList = Veil.Instance:Create("ScrollingFrame", {
+			Name = "ItemList",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			CanvasSize = UDim2.new(0, 0, 0, 0),
+			ScrollBarThickness = 0,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 245,
+			Parent = dropdown.Panel,
+		})
+
+		Veil.Instance:Create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Vertical,
+			Padding = UDim.new(0, DropdownItemSpacing),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Parent = dropdown.ItemList,
+		})
+
+		local function buildItems()
+			for _, child in ipairs(dropdown.ItemList:GetChildren()) do
+				if child:IsA("GuiButton") then
+					child:Destroy()
+				end
+			end
+			for i, item in ipairs(dropdown.Items) do
+				local isSelected = item == dropdown.Value
+				local itemButton = Veil.Instance:Create("TextButton", {
+					Name = tostring(item),
+					AutoButtonColor = false,
+					BackgroundColor3 = COLORS.Accent,
+					BackgroundTransparency = isSelected and 0.84 or 1,
+					BorderSizePixel = 0,
+					Font = Enum.Font.GothamMedium,
+					LayoutOrder = i,
+					Size = UDim2.new(1, 0, 0, DropdownItemHeight),
+					Text = tostring(item),
+					TextColor3 = isSelected and COLORS.Accent or COLORS.Text,
+					TextSize = 13,
+					TextTransparency = isSelected and 0.05 or 0.18,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					ZIndex = 245,
+					Parent = dropdown.ItemList,
+				})
+				createCorner(itemButton, 6)
+				createPadding(itemButton, 0, 8, 0, 8)
+				itemButton.MouseButton1Click:Connect(function()
+					dropdown:Set(item)
+					dropdown:Close()
+				end)
+			end
+			local totalHeight = #dropdown.Items * DropdownItemHeight
+				+ math.max(0, #dropdown.Items - 1) * DropdownItemSpacing
+			dropdown.ItemList.CanvasSize = UDim2.fromOffset(0, totalHeight)
+		end
+
+		buildItems()
+
+		local function computePanelHeight()
+			local visibleItems = math.min(#dropdown.Items, DropdownMaxVisibleItems)
+			return visibleItems * DropdownItemHeight
+				+ math.max(0, visibleItems - 1) * DropdownItemSpacing
+				+ DropdownPanelPadding * 2
+		end
+
+		function dropdown:Open()
+			if self.Disabled then return end
+			Axis:_closeActivePicker(self.Panel)
+			Axis.ActivePickerPopup = self.Panel
+			self.Panel.Visible = true
+			self.Panel:SetAttribute("AxisOpen", true)
+			if Axis.PickerBackdrop then
+				Axis.PickerBackdrop.Visible = true
+			end
+			local h = computePanelHeight()
+			self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
+			task.defer(function()
+				if self.Panel and self.Panel.Visible then
+					self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
+				end
+			end)
+		end
+
+		function dropdown:Close()
+			if self.Panel then
+				self.Panel.Visible = false
+				self.Panel:SetAttribute("AxisOpen", false)
+			end
+			if Axis.ActivePickerPopup == self.Panel then
+				Axis.ActivePickerPopup = nil
+				if Axis.PickerBackdrop and not Axis.ActiveModeMenu then
+					Axis.PickerBackdrop.Visible = false
+				end
+			end
+		end
+
+		function dropdown:Set(value, opts)
+			opts = opts or {}
+			self.Value = value
+			self.ValueLabel.Text = tostring(value or "")
+			buildItems()
+			if not opts.Silent and self.Callback then
+				pcall(self.Callback, value)
+			end
+			if not opts.Silent then
+				self.ChangedSignal:Fire(value)
+			end
+		end
+
+		function dropdown:GetValue()
+			return self.Value
+		end
+
+		function dropdown:OnChanged(callback)
+			return self.ChangedSignal:Connect(callback)
+		end
+
+		function dropdown:SetItems(newItems)
+			self.Items = newItems or {}
+			buildItems()
+		end
+
+		dropdown.Button.MouseButton1Click:Connect(function()
+			if dropdown.Disabled then return end
+			if dropdown.Panel.Visible then
+				dropdown:Close()
+			else
+				dropdown:Open()
+			end
+		end)
+
+		registerCleanup(self, UserInputService.InputBegan:Connect(function(input, processed)
+			if processed or not dropdown.Panel.Visible then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1
+				and input.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
+			local pp = dropdown.Panel.AbsolutePosition
+			local ps = dropdown.Panel.AbsoluteSize
+			local hp = dropdown.Holder.AbsolutePosition
+			local hs = dropdown.Holder.AbsoluteSize
+			local pt = input.Position
+			local inPanel = pt.X >= pp.X and pt.X <= pp.X + ps.X and pt.Y >= pp.Y and pt.Y <= pp.Y + ps.Y
+			local inHolder = pt.X >= hp.X and pt.X <= hp.X + hs.X and pt.Y >= hp.Y and pt.Y <= hp.Y + hs.Y
+			if not inPanel and not inHolder then
+				dropdown:Close()
+			end
+		end))
+
+		return dropdown
 	end
 
 	-- ── Normal Slider ────────────────────────────────────────────────────────
