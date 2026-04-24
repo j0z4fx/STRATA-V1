@@ -313,6 +313,23 @@ local steps = {
 				Column = "left",
 			})
 
+			homeTab.Columns.leftColumn:Slider({
+				Name = "Sensitivity",
+				Min = 0,
+				Max = 100,
+				Default = 50,
+				Step = 1,
+			})
+
+			homeTab.Columns.leftColumn:Slider({
+				Name = "Smoothing",
+				Min = 0,
+				Max = 1,
+				Default = 0.5,
+				Step = 0.05,
+				Subtext = "Camera smoothing amount",
+			})
+
 			homeTab.Columns.middleColumn:SectionHeader("Text Elements")
 			homeTab.Columns.middleColumn:Label({
 				Text = "Static Label",
@@ -321,6 +338,24 @@ local steps = {
 			homeTab.Columns.middleColumn:Label({
 				Text = "Static Label",
 				Subtext = "Secondary description",
+			})
+
+			homeTab.Columns.middleColumn:NotchedSlider({
+				Name = "Quality",
+				Min = 1,
+				Max = 5,
+				Default = 3,
+				Step = 1,
+			})
+
+			homeTab.Columns.middleColumn:RangeSlider({
+				Name = "Distance Range",
+				Min = 0,
+				Max = 500,
+				DefaultMin = 50,
+				DefaultMax = 250,
+				Step = 5,
+				Subtext = "Minimum and maximum range",
 			})
 
 			homeTab.Columns.rightColumn:SectionHeader("Picker Examples")
