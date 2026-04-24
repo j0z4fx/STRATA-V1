@@ -45,7 +45,10 @@ return function(Toolkit, Veil)
 	local TabHighlightIdleScale = 0.82
 	local ColumnPaddingX = 14
 	local ColumnPaddingY = 14
-	local ColumnItemSpacing = 10
+	local ElementSpacing = 6        -- gap between controls within a section
+	local SectionSpacing = 16       -- total visual gap above a section header
+	local HeaderSpacing = 8         -- total visual gap below a section header
+	local ColumnItemSpacing = ElementSpacing
 	local LabelRowHeight = 28
 	local LabelRowWithSubtextHeight = 46
 	local DividerInsetX = 6
@@ -1951,13 +1954,16 @@ return function(Toolkit, Veil)
 		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
 		ensureColumnStack(parentColumn)
 
-		local holder = createTextRow(parentColumn, options.Name or "SectionHeader", 18)
+		local leadTop = SectionSpacing - ElementSpacing
+		local leadBottom = HeaderSpacing - ElementSpacing
+		local holder = createTextRow(parentColumn, options.Name or "SectionHeader", leadTop + 18 + leadBottom)
 		holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
 
 		local text = options.Text or options.Name or "Section"
 		local textWidth = math.ceil(measureText(text, 12, Enum.Font.GothamMedium).X)
 		local clampedTextWidth = math.clamp(textWidth + 10, 36, 120)
 		local halfGap = math.floor((clampedTextWidth + SectionHeaderGap) * 0.5)
+		local visualCenterY = leadTop + 9
 
 		local centerLabel = Veil.Instance:Create("TextLabel", {
 			Name = "Title",
@@ -1965,7 +1971,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = UDim2.new(0.5, 0, 0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, visualCenterY),
 			Size = UDim2.fromOffset(clampedTextWidth, 18),
 			Text = text,
 			TextColor3 = COLORS.Text,
@@ -1983,7 +1989,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Stroke,
 			BackgroundTransparency = STROKE_TRANSPARENCY,
 			BorderSizePixel = 0,
-			Position = UDim2.new(0, DividerInsetX, 0.5, 0),
+			Position = UDim2.new(0, DividerInsetX, 0, visualCenterY),
 			Size = UDim2.new(0.5, -(DividerInsetX + halfGap), 0, 1),
 			ZIndex = 4,
 			Parent = holder,
@@ -1995,7 +2001,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Stroke,
 			BackgroundTransparency = STROKE_TRANSPARENCY,
 			BorderSizePixel = 0,
-			Position = UDim2.new(1, -DividerInsetX, 0.5, 0),
+			Position = UDim2.new(1, -DividerInsetX, 0, visualCenterY),
 			Size = UDim2.new(0.5, -(DividerInsetX + halfGap), 0, 1),
 			ZIndex = 4,
 			Parent = holder,

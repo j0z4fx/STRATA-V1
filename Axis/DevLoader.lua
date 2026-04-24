@@ -65,6 +65,8 @@ left:Slider({
 
 local middle = homeTab.Columns.middleColumn
 
+middle:SectionHeader("Notched")
+
 middle:NotchedSlider({
 	Name = "Quality",
 	Min = 1,
@@ -72,6 +74,8 @@ middle:NotchedSlider({
 	Default = 3,
 	Step = 1,
 })
+
+middle:SectionHeader("Range")
 
 middle:RangeSlider({
 	Name = "Distance Range",
