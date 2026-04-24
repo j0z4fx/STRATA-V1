@@ -657,6 +657,373 @@ function Drag:AttachSmooth(handle, target, options)
 	return self:Attach(handle, target, options)
 end
 
+local Sound = {}
+Sound.__index = Sound
+
+local function normalizeAssetId(source)
+	if type(source) == "number" then
+		return string.format("rbxassetid://%d", source)
+	end
+
+	if type(source) ~= "string" then
+		return nil
+	end
+
+	if string.match(source, "^rbxassetid://%d+$") then
+		return source
+	end
+
+	if string.match(source, "^%d+$") then
+		return "rbxassetid://" .. source
+	end
+
+	return nil
+end
+
+local function isExternalUrl(source)
+	return type(source) == "string" and string.match(source, "^https?://") ~= nil
+end
+
+local function isLikelyFilePath(source)
+	if type(source) ~= "string" then
+		return false
+	end
+
+	return string.match(source, "^[A-Za-z]:[\\/].+") ~= nil
+		or string.match(source, "^%.[\\/]") ~= nil
+		or string.match(source, "^/") ~= nil
+end
+
+local function sanitizeFileName(value)
+	value = tostring(value or "sound")
+	value = string.gsub(value, "[^%w%-_%.]", "_")
+	if value == "" then
+		return "sound"
+	end
+
+	return value
+end
+
+local function getHttpContent(url)
+	if type(url) ~= "string" then
+		return nil
+	end
+
+	if type(game.HttpGetAsync) == "function" then
+		local success, result = pcall(game.HttpGetAsync, game, url)
+		if success and type(result) == "string" then
+			return result
+		end
+	end
+
+	if type(game.HttpGet) == "function" then
+		local success, result = pcall(game.HttpGet, game, url)
+		if success and type(result) == "string" then
+			return result
+		end
+	end
+
+	return nil
+end
+
+function Sound.new(services, instanceManager)
+	local self = setmetatable({}, Sound)
+	self._services = services
+	self._instances = instanceManager
+	self._cache = {}
+	self._active = {}
+
+	return self
+end
+
+function Sound:_getCacheKey(source, options)
+	local cacheKey = options and options.CacheKey
+	if cacheKey ~= nil then
+		return tostring(cacheKey)
+	end
+
+	return tostring(source)
+end
+
+function Sound:_getFallbackAssetId(options)
+	return normalizeAssetId(options and options.FallbackAssetId)
+end
+
+function Sound:_getSoundParent(options)
+	if options and options.Parent then
+		return options.Parent
+	end
+
+	return self._services:Get("SoundService")
+		or self._services:Get("CoreGui")
+		or workspace
+end
+
+function Sound:_resolveLocalFile(source)
+	if type(getcustomasset) ~= "function" then
+		return nil
+	end
+
+	if type(isfile) == "function" then
+		local success, exists = pcall(isfile, source)
+		if success and not exists then
+			return nil
+		end
+	end
+
+	for _, path in ipairs({ source, string.gsub(source, "\\", "/") }) do
+		local success, asset = pcall(getcustomasset, path)
+		if success and type(asset) == "string" then
+			return asset
+		end
+	end
+
+	return nil
+end
+
+function Sound:_resolveExternalFile(source, options)
+	if type(writefile) ~= "function" or type(getcustomasset) ~= "function" then
+		return nil
+	end
+
+	local content = getHttpContent(source)
+	if not content then
+		return nil
+	end
+
+	local extension = options and options.Extension
+	if type(extension) ~= "string" or extension == "" then
+		extension = string.match(source, "%.([%w]+)$") or "mp3"
+	end
+
+	local baseName = options and options.FileName
+	if type(baseName) ~= "string" or baseName == "" then
+		baseName = sanitizeFileName((options and options.CacheKey) or source)
+	end
+
+	local folder = "StrataCache"
+	if type(makefolder) == "function" then
+		pcall(makefolder, folder)
+	end
+
+	local filePath = string.format("%s/%s.%s", folder, sanitizeFileName(baseName), sanitizeFileName(extension))
+	local writeSuccess = pcall(writefile, filePath, content)
+	if not writeSuccess then
+		return nil
+	end
+
+	local assetSuccess, asset = pcall(getcustomasset, filePath)
+	if assetSuccess and type(asset) == "string" then
+		return asset
+	end
+
+	return nil
+end
+
+function Sound:Resolve(source, options)
+	options = Util.TableShallowCopy(options or {})
+	local cacheKey = self:_getCacheKey(source, options)
+	local cached = self._cache[cacheKey]
+	if type(cached) == "string" then
+		return cached
+	end
+
+	local resolved = normalizeAssetId(source)
+	if not resolved and isLikelyFilePath(source) then
+		resolved = self:_resolveLocalFile(source)
+	end
+
+	if not resolved and isExternalUrl(source) then
+		resolved = self:_resolveExternalFile(source, options)
+	end
+
+	if not resolved then
+		resolved = self:_getFallbackAssetId(options)
+	end
+
+	if type(resolved) == "string" then
+		self._cache[cacheKey] = resolved
+		return resolved
+	end
+
+	return nil
+end
+
+function Sound:_createInstance(properties, options)
+	local factory = options and options.InstanceFactory
+	if type(factory) == "function" then
+		local success, instance = pcall(factory, properties)
+		if success and instance then
+			return instance
+		end
+	end
+
+	return self._instances:Create("Sound", properties)
+end
+
+function Sound:_destroyInstance(sound, options)
+	local destroyer = options and options.Destroyer
+	if type(destroyer) == "function" then
+		pcall(destroyer, sound)
+		return
+	end
+
+	self._instances:Destroy(sound)
+end
+
+function Sound:_track(sound, options)
+	if not sound then
+		return
+	end
+
+	local entry = {
+		Destroyer = function()
+			self:_destroyInstance(sound, options)
+		end,
+	}
+
+	self._active[sound] = entry
+
+	if options.DestroyOnEnd and not options.Looped and sound.Ended then
+		entry.EndedConnection = sound.Ended:Connect(function()
+			local activeEntry = self._active[sound]
+			if not activeEntry then
+				return
+			end
+
+			if activeEntry.EndedConnection then
+				disconnect(activeEntry.EndedConnection)
+			end
+
+			self._active[sound] = nil
+			activeEntry.Destroyer()
+		end)
+	end
+
+	if sound.AncestryChanged then
+		entry.AncestryConnection = sound.AncestryChanged:Connect(function(_, parent)
+			if parent ~= nil then
+				return
+			end
+
+			local activeEntry = self._active[sound]
+			if not activeEntry then
+				return
+			end
+
+			if activeEntry.EndedConnection then
+				disconnect(activeEntry.EndedConnection)
+			end
+
+			if activeEntry.AncestryConnection then
+				disconnect(activeEntry.AncestryConnection)
+			end
+
+			self._active[sound] = nil
+		end)
+	end
+end
+
+function Sound:Create(source, options)
+	options = Util.TableShallowCopy(options or {})
+	local soundId = self:Resolve(source, options)
+	if not soundId then
+		return nil
+	end
+
+	local sound = self:_createInstance({
+		Name = options.Name,
+		Parent = self:_getSoundParent(options),
+		SoundId = soundId,
+		Volume = tonumber(options.Volume) or 0.5,
+		PlaybackSpeed = tonumber(options.PlaybackSpeed) or 1,
+		Looped = not not options.Looped,
+		TimePosition = tonumber(options.TimePosition) or 0,
+	}, options)
+
+	if not sound then
+		return nil
+	end
+
+	self:_track(sound, options)
+	return sound
+end
+
+function Sound:Preload(source, options)
+	options = Util.TableShallowCopy(options or {})
+	local soundId = self:Resolve(source, options)
+	if not soundId then
+		return nil
+	end
+
+	local contentProvider = self._services:Get("ContentProvider")
+	if not contentProvider or type(contentProvider.PreloadAsync) ~= "function" then
+		return soundId
+	end
+
+	local sound = self._instances:Create("Sound", {
+		Name = options.Name or "PreloadSound",
+		Parent = self:_getSoundParent(options),
+		SoundId = soundId,
+		Volume = 0,
+		_skipTrack = true,
+	})
+
+	pcall(contentProvider.PreloadAsync, contentProvider, { sound })
+	self._instances:Destroy(sound)
+
+	return soundId
+end
+
+function Sound:Play(source, options)
+	options = Util.TableShallowCopy(options or {})
+	if options.DestroyOnEnd == nil then
+		options.DestroyOnEnd = not options.Looped
+	end
+
+	local sound = self:Create(source, options)
+	if not sound then
+		return nil
+	end
+
+	local success = pcall(sound.Play, sound)
+	if not success then
+		local entry = self._active[sound]
+		if entry then
+			if entry.EndedConnection then
+				disconnect(entry.EndedConnection)
+			end
+			if entry.AncestryConnection then
+				disconnect(entry.AncestryConnection)
+			end
+			self._active[sound] = nil
+		end
+		self:_destroyInstance(sound, options)
+		return nil
+	end
+
+	return sound
+end
+
+function Sound:StopAll()
+	for sound, entry in pairs(self._active) do
+		pcall(sound.Stop, sound)
+		if entry.EndedConnection then
+			disconnect(entry.EndedConnection)
+		end
+		if entry.AncestryConnection then
+			disconnect(entry.AncestryConnection)
+		end
+		self._active[sound] = nil
+		entry.Destroyer()
+	end
+end
+
+function Sound:Cleanup()
+	self:StopAll()
+	Util.ClearTable(self._cache)
+end
+
 local Toolkit = {
 	Util = Util,
 	Signal = Signal,
@@ -666,6 +1033,7 @@ local Toolkit = {
 		Instance = InstanceManager,
 		Tasks = Tasks,
 		State = State,
+		Sound = Sound,
 	},
 }
 
@@ -675,10 +1043,12 @@ Toolkit.Instance = InstanceManager.new()
 Toolkit.Tasks = Tasks.new()
 Toolkit.State = State.new()
 Toolkit.Drag = Drag.new(Toolkit.Services)
+Toolkit.Sound = Sound.new(Toolkit.Services, Toolkit.Instance)
 
 function Toolkit:Cleanup()
 	self.Connections:Cleanup()
 	self.Tasks:Cleanup()
+	self.Sound:Cleanup()
 	self.Instance:Cleanup()
 end
 

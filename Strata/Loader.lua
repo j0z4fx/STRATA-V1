@@ -6,6 +6,7 @@ local BASE_URL = DEV and RAW_BASE_URL or CDN_BASE_URL
 local TOOLKIT_URL = BASE_URL .. "/Toolkit/src/init.lua"
 local VEIL_URL = BASE_URL .. "/Veil/src/init.lua"
 local AXIS_URL = BASE_URL .. "/Axis/src/init.lua"
+local LOAD_COMPLETE_SOUND = "C:\\Users\\vvs\\Documents\\STRATA-V1\\Axis\\Sounds\\LoadComplete.mp3"
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -289,5 +290,27 @@ end
 
 task.wait(0.1)
 destroyLoader()
+
+if context.Axis then
+	pcall(function()
+		context.Axis:Toast({
+			Title = "Strata",
+			Message = "Load complete",
+			Duration = 3.5,
+			Location = "BottomCenter",
+		})
+	end)
+end
+
+if context.Veil and context.Veil.Sound then
+	pcall(function()
+		context.Veil.Sound:Play(LOAD_COMPLETE_SOUND, {
+			Name = "LoadComplete",
+			Volume = 0.45,
+			DestroyOnEnd = true,
+			CacheKey = "Strata.LoadComplete",
+		})
+	end)
+end
 
 return context.Axis

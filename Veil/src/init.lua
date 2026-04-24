@@ -2,6 +2,7 @@ return function(Toolkit)
 	assert(type(Toolkit) == "table", "[Veil] Toolkit dependency is required")
 	assert(type(Toolkit.Util) == "table", "[Veil] Toolkit.Util is required")
 	assert(type(Toolkit.Modules) == "table", "[Veil] Toolkit.Modules is required")
+	assert(type(Toolkit.Sound) == "table", "[Veil] Toolkit.Sound is required")
 
 	local Util = Toolkit.Util
 	local ServicesBase = Toolkit.Modules.Services
@@ -631,6 +632,102 @@ return function(Toolkit)
 		return false, "No validator configured"
 	end
 
+	local SoundControl = {}
+	SoundControl.__index = SoundControl
+
+	function SoundControl.new(toolkitSound, services, instanceControl)
+		local self = setmetatable({}, SoundControl)
+		self._toolkitSound = toolkitSound
+		self._services = services
+		self._instance = instanceControl
+		self._active = {}
+
+		return self
+	end
+
+	function SoundControl:_getParent(options)
+		if options and options.Parent then
+			return options.Parent
+		end
+
+		return self._services:Get("SoundService")
+			or self._services:Get("CoreGui")
+			or workspace
+	end
+
+	function SoundControl:_track(sound, destroyer)
+		if sound then
+			self._active[sound] = destroyer
+		end
+
+		return sound
+	end
+
+	function SoundControl:_release(sound)
+		self._active[sound] = nil
+	end
+
+	function SoundControl:_buildOptions(options)
+		local soundOptions = Util.TableShallowCopy(options or {})
+		local parent = self:_getParent(soundOptions)
+
+		soundOptions.Parent = parent
+		soundOptions.InstanceFactory = function(properties)
+			local props = Util.TableShallowCopy(properties or {})
+			props.Parent = parent
+			return self._instance:Create("Sound", props)
+		end
+
+		soundOptions.Destroyer = function(sound)
+			self:_release(sound)
+			self._instance:SecureDestroy(sound)
+		end
+
+		return soundOptions
+	end
+
+	function SoundControl:Create(source, options)
+		local soundOptions = self:_buildOptions(options)
+		local sound = self._toolkitSound:Create(source, soundOptions)
+		if sound then
+			self:_track(sound, soundOptions.Destroyer)
+		end
+
+		return sound
+	end
+
+	function SoundControl:Play(source, options)
+		local soundOptions = self:_buildOptions(options)
+		if soundOptions.DestroyOnEnd == nil then
+			soundOptions.DestroyOnEnd = not soundOptions.Looped
+		end
+
+		local sound = self._toolkitSound:Play(source, soundOptions)
+		if sound then
+			self:_track(sound, soundOptions.Destroyer)
+		end
+
+		return sound
+	end
+
+	function SoundControl:Preload(source, options)
+		return self._toolkitSound:Preload(source, options)
+	end
+
+	function SoundControl:StopAll()
+		for sound, destroyer in pairs(Util.TableShallowCopy(self._active)) do
+			pcall(sound.Stop, sound)
+			self._active[sound] = nil
+			if type(destroyer) == "function" then
+				destroyer(sound)
+			end
+		end
+	end
+
+	function SoundControl:Cleanup()
+		self:StopAll()
+	end
+
 	local Veil = {
 		Toolkit = Toolkit,
 		Config = Config,
@@ -644,6 +741,7 @@ return function(Toolkit)
 	Veil.Hooks = Hooks.new()
 	Veil.Env = Env.new()
 	Veil.Security = Security.new(Config, Veil.Env)
+	Veil.Sound = SoundControl.new(Toolkit.Sound, Veil.Services, Veil.Instance)
 
 	Veil.Env:SetGlobal("Toolkit", Toolkit)
 	Veil.Env:SetGlobal("Veil", Veil)
