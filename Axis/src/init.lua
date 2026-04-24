@@ -10,6 +10,8 @@ return function(Toolkit, Veil)
 		Windows = {},
 	}
 
+	local TextService = Veil.Services:Get("TextService")
+
 	local Window = {}
 	Window.__index = Window
 
@@ -23,6 +25,27 @@ return function(Toolkit, Veil)
 	}
 
 	local STROKE_TRANSPARENCY = 0.935
+
+	local function measureText(text, size, font)
+		if not TextService then
+			return Vector2.new(#tostring(text) * size * 0.5, size)
+		end
+
+		local success, result = pcall(function()
+			return TextService:GetTextSize(
+				tostring(text),
+				size,
+				font,
+				Vector2.new(math.huge, math.huge)
+			)
+		end)
+
+		if success then
+			return result
+		end
+
+		return Vector2.new(#tostring(text) * size * 0.5, size)
+	end
 
 	local function createCorner(parent, radius)
 		return Veil.Instance:Create("UICorner", {
@@ -117,6 +140,7 @@ return function(Toolkit, Veil)
 
 		local self = setmetatable({}, Window)
 		self.Title = options.Title or "Strata"
+		self.StatusText = "Pre-Alpha"
 		self.Surface = Axis.Surface
 		self.Id = Toolkit.Util.GenerateId("AxisWindow")
 		self.State = Toolkit.State:Scope(self.Id)
@@ -164,12 +188,11 @@ return function(Toolkit, Veil)
 
 		self.TitlebarText = Veil.Instance:Create("TextLabel", {
 			Name = "Title",
-			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
 			LayoutOrder = 1,
-			Size = UDim2.fromOffset(0, 18),
+			Size = UDim2.fromOffset(math.ceil(measureText(self.Title, 14, Enum.Font.GothamMedium).X), 18),
 			Text = self.Title,
 			TextColor3 = COLORS.Text,
 			TextSize = 14,
@@ -180,14 +203,16 @@ return function(Toolkit, Veil)
 			Parent = self.TitlebarContent,
 		})
 
+		local chipTextBounds = measureText(self.StatusText, 12, Enum.Font.GothamMedium)
+		local chipWidth = math.ceil(chipTextBounds.X) + 4
+
 		self.StatusChip = Veil.Instance:Create("Frame", {
 			Name = "StatusChip",
-			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundColor3 = COLORS.Accent,
 			BackgroundTransparency = 0.84,
 			BorderSizePixel = 0,
 			LayoutOrder = 2,
-			Size = UDim2.fromOffset(0, 18),
+			Size = UDim2.fromOffset(chipWidth, 18),
 			ZIndex = 5,
 			Parent = self.TitlebarContent,
 		})
@@ -202,12 +227,12 @@ return function(Toolkit, Veil)
 
 		self.StatusChipText = Veil.Instance:Create("TextLabel", {
 			Name = "Text",
-			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Size = UDim2.fromOffset(0, 18),
-			Text = "Pre-Alpha",
+			Size = UDim2.new(1, -4, 1, 0),
+			Position = UDim2.fromOffset(2, 0),
+			Text = self.StatusText,
 			TextColor3 = COLORS.Accent,
 			TextSize = 12,
 			TextTransparency = 0.1,
