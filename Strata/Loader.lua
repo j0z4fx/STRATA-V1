@@ -7,5 +7,5 @@ local Veil = loadstring(game:HttpGet(VEIL_URL))()(Toolkit)
 local Axis = loadstring(game:HttpGet(AXIS_URL))()(Toolkit, Veil)
 
 return Axis:CreateWindow({
-	Title = "Axis Dev",
+	Title = "Strata",
 })

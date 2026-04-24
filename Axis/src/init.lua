@@ -18,7 +18,8 @@ return function(Toolkit, Veil)
 		Titlebar = Color3.fromRGB(24, 24, 27),
 		Sidebar = Color3.fromRGB(17, 17, 19),
 		Stroke = Color3.fromRGB(255, 255, 255),
-		Text = Color3.fromRGB(255, 255, 255),
+		Text = Color3.fromRGB(238, 238, 242),
+		Accent = Color3.fromRGB(242, 168, 190),
 	}
 
 	local STROKE_TRANSPARENCY = 0.935
@@ -110,7 +111,7 @@ return function(Toolkit, Veil)
 		options = options or {}
 
 		local self = setmetatable({}, Window)
-		self.Title = options.Title or "Axis"
+		self.Title = options.Title or "Strata"
 		self.Surface = Axis.Surface
 		self.Id = Toolkit.Util.GenerateId("AxisWindow")
 		self.State = Toolkit.State:Scope(self.Id)
@@ -138,20 +139,64 @@ return function(Toolkit, Veil)
 
 		self.TitlebarShell = buildTitlebarShell(self.Titlebar)
 
+		self.TitlebarContent = Veil.Instance:Create("Frame", {
+			Name = "TitlebarContent",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(14, 11),
+			Size = UDim2.new(1, -28, 0, 18),
+			Parent = self.Titlebar,
+		})
+
+		Veil.Instance:Create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			Padding = UDim.new(0, 4),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Parent = self.TitlebarContent,
+		})
+
 		self.TitlebarText = Veil.Instance:Create("TextLabel", {
 			Name = "Title",
+			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = UDim2.fromOffset(14, 11),
-			Size = UDim2.new(1, -28, 0, 18),
+			LayoutOrder = 1,
+			Size = UDim2.fromOffset(0, 18),
 			Text = self.Title,
 			TextColor3 = COLORS.Text,
 			TextSize = 14,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Center,
-			Parent = self.Titlebar,
+			Parent = self.TitlebarContent,
+		})
+
+		self.StatusChip = Veil.Instance:Create("TextLabel", {
+			Name = "StatusChip",
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundColor3 = COLORS.Accent,
+			BackgroundTransparency = 0.84,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			LayoutOrder = 2,
+			Size = UDim2.fromOffset(0, 18),
+			Text = "Pre-Alpha",
+			TextColor3 = COLORS.Accent,
+			TextSize = 12,
+			TextTransparency = 0.1,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			Parent = self.TitlebarContent,
+		})
+
+		createCorner(self.StatusChip, 4)
+
+		Veil.Instance:Create("UIPadding", {
+			PaddingLeft = UDim.new(0, 2),
+			PaddingRight = UDim.new(0, 2),
+			Parent = self.StatusChip,
 		})
 
 		self.Body = Veil.Instance:Create("Frame", {
@@ -182,7 +227,9 @@ return function(Toolkit, Veil)
 			Parent = self.Body,
 		})
 
-		self.DragBinding = Toolkit.Drag:Attach(self.Titlebar, self.Frame)
+		self.DragBinding = Toolkit.Drag:AttachSmooth(self.Titlebar, self.Frame, {
+			Smoothness = 0.15,
+		})
 		self.State:Set("Surface", self.Surface)
 
 		return self

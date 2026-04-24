@@ -538,6 +538,7 @@ function Drag:Attach(handle, target, options)
 	options = options or {}
 
 	local userInputService = self._services:Require("UserInputService")
+	local runService = self._services:Require("RunService")
 	local binding = setmetatable({
 		Connected = true,
 		_connections = {},
@@ -547,6 +548,9 @@ function Drag:Attach(handle, target, options)
 	local dragInput
 	local dragStart
 	local startPosition
+	local targetPosition
+	local smoothness = math.clamp(tonumber(options.Smoothness) or 0.15, 0.01, 1)
+	local mode = tostring(options.Mode or "Instant")
 
 	local function stopDragging()
 		dragging = false
@@ -568,12 +572,16 @@ function Drag:Attach(handle, target, options)
 			offsetY = math.clamp(offsetY, 0, parentSize.Y - target.AbsoluteSize.Y)
 		end
 
-		target.Position = UDim2.new(
+		targetPosition = UDim2.new(
 			startPosition.X.Scale,
 			offsetX,
 			startPosition.Y.Scale,
 			offsetY
 		)
+
+		if mode ~= "Smooth" then
+			target.Position = targetPosition
+		end
 	end
 
 	binding._connections.InputBegan = handle.InputBegan:Connect(function(input)
@@ -585,6 +593,7 @@ function Drag:Attach(handle, target, options)
 		dragInput = input
 		dragStart = input.Position
 		startPosition = target.Position
+		targetPosition = target.Position
 
 		local inputEnded
 		inputEnded = input.Changed:Connect(function()
@@ -607,6 +616,22 @@ function Drag:Attach(handle, target, options)
 		updatePosition(input)
 	end)
 
+	if mode == "Smooth" then
+		binding._connections.RenderStepped = runService.RenderStepped:Connect(function()
+			if not dragging or not targetPosition then
+				return
+			end
+
+			local current = target.Position
+			target.Position = UDim2.new(
+				current.X.Scale + (targetPosition.X.Scale - current.X.Scale) * smoothness,
+				current.X.Offset + (targetPosition.X.Offset - current.X.Offset) * smoothness,
+				current.Y.Scale + (targetPosition.Y.Scale - current.Y.Scale) * smoothness,
+				current.Y.Offset + (targetPosition.Y.Offset - current.Y.Offset) * smoothness
+			)
+		end)
+	end
+
 	binding._connections.AncestryChanged = target.AncestryChanged:Connect(function(_, parent)
 		if parent == nil then
 			binding:Disconnect()
@@ -614,6 +639,22 @@ function Drag:Attach(handle, target, options)
 	end)
 
 	return binding
+end
+
+function Drag:AttachInstant(handle, target, options)
+	options = Util.TableShallowCopy(options or {})
+	options.Mode = "Instant"
+	return self:Attach(handle, target, options)
+end
+
+function Drag:AttachSmooth(handle, target, options)
+	options = Util.TableShallowCopy(options or {})
+	options.Mode = "Smooth"
+	if options.Smoothness == nil then
+		options.Smoothness = 0.15
+	end
+
+	return self:Attach(handle, target, options)
 end
 
 local Toolkit = {
