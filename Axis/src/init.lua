@@ -38,7 +38,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Position = position,
 			Size = size,
-			ZIndex = parent.ZIndex + 1,
+			ZIndex = 3,
 			Parent = parent,
 		})
 	end
@@ -49,6 +49,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Titlebar,
 			BorderSizePixel = 0,
 			Size = UDim2.new(1, 0, 1, 0),
+			ZIndex = 2,
 			Parent = parent,
 		})
 
@@ -60,6 +61,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(0, 14),
 			Size = UDim2.new(1, 0, 1, -14),
+			ZIndex = 2,
 			Parent = shell,
 		})
 
@@ -77,6 +79,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Sidebar,
 			BorderSizePixel = 0,
 			Size = UDim2.new(1, 0, 1, 0),
+			ZIndex = 2,
 			Parent = parent,
 		})
 
@@ -87,6 +90,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Sidebar,
 			BorderSizePixel = 0,
 			Size = UDim2.new(1, 0, 0, 14),
+			ZIndex = 2,
 			Parent = shell,
 		})
 
@@ -96,6 +100,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(14, 0),
 			Size = UDim2.new(1, -14, 1, 0),
+			ZIndex = 2,
 			Parent = shell,
 		})
 
@@ -145,6 +150,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(14, 11),
 			Size = UDim2.new(1, -28, 0, 18),
+			ZIndex = 4,
 			Parent = self.Titlebar,
 		})
 
@@ -170,24 +176,19 @@ return function(Toolkit, Veil)
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 5,
 			Parent = self.TitlebarContent,
 		})
 
-		self.StatusChip = Veil.Instance:Create("TextLabel", {
+		self.StatusChip = Veil.Instance:Create("Frame", {
 			Name = "StatusChip",
 			AutomaticSize = Enum.AutomaticSize.X,
 			BackgroundColor3 = COLORS.Accent,
 			BackgroundTransparency = 0.84,
 			BorderSizePixel = 0,
-			Font = Enum.Font.GothamMedium,
 			LayoutOrder = 2,
 			Size = UDim2.fromOffset(0, 18),
-			Text = "Pre-Alpha",
-			TextColor3 = COLORS.Accent,
-			TextSize = 12,
-			TextTransparency = 0.1,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 5,
 			Parent = self.TitlebarContent,
 		})
 
@@ -199,9 +200,26 @@ return function(Toolkit, Veil)
 			Parent = self.StatusChip,
 		})
 
+		self.StatusChipText = Veil.Instance:Create("TextLabel", {
+			Name = "Text",
+			AutomaticSize = Enum.AutomaticSize.X,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Size = UDim2.fromOffset(0, 18),
+			Text = "Pre-Alpha",
+			TextColor3 = COLORS.Accent,
+			TextSize = 12,
+			TextTransparency = 0.1,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 6,
+			Parent = self.StatusChip,
+		})
+
 		self.Body = Veil.Instance:Create("Frame", {
 			Name = "Body",
-			BackgroundTransparency = 1,
+			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(0, 40),
 			Size = UDim2.new(1, 0, 1, -40),
@@ -220,7 +238,7 @@ return function(Toolkit, Veil)
 
 		self.Content = Veil.Instance:Create("Frame", {
 			Name = "Content",
-			BackgroundTransparency = 1,
+			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(42, 0),
 			Size = UDim2.new(1, -42, 1, 0),
