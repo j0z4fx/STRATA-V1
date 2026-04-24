@@ -6,7 +6,7 @@ local BASE_URL = DEV and RAW_BASE_URL or CDN_BASE_URL
 local TOOLKIT_URL = BASE_URL .. "/Toolkit/src/init.lua"
 local VEIL_URL = BASE_URL .. "/Veil/src/init.lua"
 local AXIS_URL = BASE_URL .. "/Axis/src/init.lua"
-local LOAD_COMPLETE_SOUND = "C:\\Users\\vvs\\Documents\\STRATA-V1\\Axis\\Sounds\\LoadComplete.mp3"
+local LOAD_COMPLETE_SOUND = BASE_URL .. "/Axis/Sounds/LoadComplete.mp3"
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")

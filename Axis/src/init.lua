@@ -33,11 +33,12 @@ return function(Toolkit, Veil)
 	local MinColumnWidth = 150
 	local ResizeSmoothness = 0.18
 	local OverlaySpacing = 10
-	local OverlayAnimationTime = 0.22
+	local OverlayAnimationTime = 0.28
 	local OverlayCornerRadius = 12
 	local OverlayAccentLineWidth = 3
 	local ToastWidth = 320
 	local NotificationWidth = 340
+	local WindowDragSmoothness = 0.1
 	local Lucide
 
 	local function loadLucide()
@@ -90,8 +91,8 @@ return function(Toolkit, Veil)
 			HostSize = UDim2.new(0, 420, 1, -36),
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
 			VerticalAlignment = Enum.VerticalAlignment.Top,
-			EnterOffset = Vector2.new(0, -14),
-			ExitOffset = Vector2.new(0, -14),
+			EnterOffset = Vector2.new(0, -24),
+			ExitOffset = Vector2.new(0, -24),
 		},
 		BottomCenter = {
 			Surface = "Toast",
@@ -101,8 +102,8 @@ return function(Toolkit, Veil)
 			HostSize = UDim2.new(0, 420, 1, -36),
 			HorizontalAlignment = Enum.HorizontalAlignment.Center,
 			VerticalAlignment = Enum.VerticalAlignment.Bottom,
-			EnterOffset = Vector2.new(0, 14),
-			ExitOffset = Vector2.new(0, 14),
+			EnterOffset = Vector2.new(0, 24),
+			ExitOffset = Vector2.new(0, 24),
 		},
 	}
 	local NOTIFICATION_LOCATIONS = {
@@ -114,8 +115,8 @@ return function(Toolkit, Veil)
 			HostSize = UDim2.new(0, 360, 1, -36),
 			HorizontalAlignment = Enum.HorizontalAlignment.Left,
 			VerticalAlignment = Enum.VerticalAlignment.Top,
-			EnterOffset = Vector2.new(-18, 0),
-			ExitOffset = Vector2.new(-18, 0),
+			EnterOffset = Vector2.new(-28, 0),
+			ExitOffset = Vector2.new(-28, 0),
 			Edge = "Left",
 		},
 		TopRight = {
@@ -126,8 +127,8 @@ return function(Toolkit, Veil)
 			HostSize = UDim2.new(0, 360, 1, -36),
 			HorizontalAlignment = Enum.HorizontalAlignment.Right,
 			VerticalAlignment = Enum.VerticalAlignment.Top,
-			EnterOffset = Vector2.new(18, 0),
-			ExitOffset = Vector2.new(18, 0),
+			EnterOffset = Vector2.new(28, 0),
+			ExitOffset = Vector2.new(28, 0),
 			Edge = "Right",
 		},
 		BottomLeft = {
@@ -138,8 +139,8 @@ return function(Toolkit, Veil)
 			HostSize = UDim2.new(0, 360, 1, -36),
 			HorizontalAlignment = Enum.HorizontalAlignment.Left,
 			VerticalAlignment = Enum.VerticalAlignment.Bottom,
-			EnterOffset = Vector2.new(-18, 0),
-			ExitOffset = Vector2.new(-18, 0),
+			EnterOffset = Vector2.new(-28, 0),
+			ExitOffset = Vector2.new(-28, 0),
 			Edge = "Left",
 		},
 		BottomRight = {
@@ -150,8 +151,8 @@ return function(Toolkit, Veil)
 			HostSize = UDim2.new(0, 360, 1, -36),
 			HorizontalAlignment = Enum.HorizontalAlignment.Right,
 			VerticalAlignment = Enum.VerticalAlignment.Bottom,
-			EnterOffset = Vector2.new(18, 0),
-			ExitOffset = Vector2.new(18, 0),
+			EnterOffset = Vector2.new(28, 0),
+			ExitOffset = Vector2.new(28, 0),
 			Edge = "Right",
 		},
 	}
@@ -196,12 +197,37 @@ return function(Toolkit, Veil)
 
 	local function createBorder(parent)
 		return Veil.Instance:Create("UIStroke", {
+			Name = "OverlayBorder",
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 			Color = COLORS.Stroke,
 			Transparency = STROKE_TRANSPARENCY,
 			Thickness = 1,
 			Parent = parent,
 		})
+	end
+
+	local function setOverlayVisualState(card, isVisible)
+		if not card then
+			return
+		end
+
+		local cardBackground = isVisible and 0 or 1
+		card.BackgroundTransparency = cardBackground
+
+		for _, descendant in ipairs(card:GetDescendants()) do
+			if descendant:IsA("UIStroke") then
+				descendant.Transparency = isVisible and STROKE_TRANSPARENCY or 1
+			elseif descendant:IsA("TextLabel") then
+				local baseTextTransparency = descendant:GetAttribute("AxisBaseTextTransparency")
+				if baseTextTransparency == nil then
+					baseTextTransparency = descendant.TextTransparency
+					descendant:SetAttribute("AxisBaseTextTransparency", baseTextTransparency)
+				end
+				descendant.TextTransparency = isVisible and baseTextTransparency or 1
+			elseif descendant:IsA("Frame") and descendant.Name == "AccentEdge" then
+				descendant.BackgroundTransparency = isVisible and 0 or 1
+			end
+		end
 	end
 
 	local function createStrokeLine(parent, size, position)
@@ -516,10 +542,39 @@ return function(Toolkit, Veil)
 		return leftColumn, middleColumn, rightColumn
 	end
 
-	local function animateOverlayCard(card, targetOffset, onComplete)
+	local function animateOverlayCard(card, targetOffset, isVisible, onComplete)
 		local tween = TweenService:Create(card, TweenInfo.new(OverlayAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 			Position = UDim2.fromOffset(targetOffset.X, targetOffset.Y),
 		})
+		local tweens = {
+			tween,
+		}
+
+		local cardTween = TweenService:Create(card, TweenInfo.new(OverlayAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = isVisible and 0 or 1,
+		})
+		table.insert(tweens, cardTween)
+
+		for _, descendant in ipairs(card:GetDescendants()) do
+			if descendant:IsA("UIStroke") then
+				table.insert(tweens, TweenService:Create(descendant, TweenInfo.new(OverlayAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					Transparency = isVisible and STROKE_TRANSPARENCY or 1,
+				}))
+			elseif descendant:IsA("TextLabel") then
+				local baseTextTransparency = descendant:GetAttribute("AxisBaseTextTransparency")
+				if baseTextTransparency == nil then
+					baseTextTransparency = descendant.TextTransparency
+					descendant:SetAttribute("AxisBaseTextTransparency", baseTextTransparency)
+				end
+				table.insert(tweens, TweenService:Create(descendant, TweenInfo.new(OverlayAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					TextTransparency = isVisible and baseTextTransparency or 1,
+				}))
+			elseif descendant:IsA("Frame") and descendant.Name == "AccentEdge" then
+				table.insert(tweens, TweenService:Create(descendant, TweenInfo.new(OverlayAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					BackgroundTransparency = isVisible and 0 or 1,
+				}))
+			end
+		end
 
 		if onComplete then
 			local connection
@@ -531,7 +586,10 @@ return function(Toolkit, Veil)
 			end)
 		end
 
-		tween:Play()
+		for _, activeTween in ipairs(tweens) do
+			activeTween:Play()
+		end
+
 		return tween
 	end
 
@@ -603,6 +661,7 @@ return function(Toolkit, Veil)
 			Text = text,
 			TextColor3 = color,
 			TextSize = 14,
+			TextTransparency = 0,
 			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Top,
@@ -922,7 +981,7 @@ return function(Toolkit, Veil)
 		end
 
 		self.DragBinding = Toolkit.Drag:AttachSmooth(self.Titlebar, self.Frame, {
-			Smoothness = 0.15,
+			Smoothness = WindowDragSmoothness,
 		})
 		self.RenderBinding = RunService.RenderStepped:Connect(function()
 			local mouseLocation = UserInputService:GetMouseLocation()
@@ -1146,7 +1205,7 @@ return function(Toolkit, Veil)
 		end
 
 		entry.Destroyed = true
-		animateOverlayCard(entry.Card, entry.ExitOffset, function()
+		animateOverlayCard(entry.Card, entry.ExitOffset, false, function()
 			if entry.Wrapper then
 				Veil.Instance:SecureDestroy(entry.Wrapper)
 				entry.Wrapper = nil
@@ -1177,6 +1236,8 @@ return function(Toolkit, Veil)
 			buildNotificationCard(card, accentColor, config.Edge, options, 210)
 		end
 
+		setOverlayVisualState(card, false)
+
 		local entry = {
 			Card = card,
 			Wrapper = wrapper,
@@ -1193,7 +1254,7 @@ return function(Toolkit, Veil)
 				return
 			end
 
-			animateOverlayCard(entry.Card, Vector2.zero)
+			animateOverlayCard(entry.Card, Vector2.zero, true)
 		end)
 
 		task.delay(math.max(0.5, tonumber(options.Duration) or (kind == "Toast" and 3.5 or 5)), function()
