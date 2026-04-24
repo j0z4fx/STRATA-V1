@@ -304,6 +304,11 @@ end
 
 if context.Veil and context.Veil.Sound then
 	pcall(function()
+		context.Veil.Sound:Preload(LOAD_COMPLETE_SOUND, {
+			Name = "LoadCompletePreload",
+			CacheKey = "Strata.LoadComplete",
+		})
+
 		context.Veil.Sound:Play(LOAD_COMPLETE_SOUND, {
 			Name = "LoadComplete",
 			Volume = 0.45,

@@ -704,6 +704,25 @@ local function sanitizeFileName(value)
 	return value
 end
 
+local function ensureCacheFolder()
+	local folder = "StrataCache"
+	if type(makefolder) == "function" then
+		pcall(makefolder, folder)
+	end
+
+	return folder
+end
+
+local function extractFileName(path, fallbackName)
+	if type(path) ~= "string" or path == "" then
+		return sanitizeFileName(fallbackName or "sound")
+	end
+
+	local normalized = string.gsub(path, "\\", "/")
+	local fileName = string.match(normalized, "([^/]+)$")
+	return sanitizeFileName(fileName or fallbackName or "sound")
+end
+
 local function getHttpContent(url)
 	if type(url) ~= "string" then
 		return nil
@@ -778,6 +797,25 @@ function Sound:_resolveLocalFile(source)
 		end
 	end
 
+	if type(readfile) ~= "function" or type(writefile) ~= "function" then
+		return nil
+	end
+
+	for _, path in ipairs({ source, string.gsub(source, "\\", "/") }) do
+		local readSuccess, content = pcall(readfile, path)
+		if readSuccess and type(content) == "string" and content ~= "" then
+			local folder = ensureCacheFolder()
+			local cachePath = string.format("%s/%s", folder, extractFileName(path, "sound.mp3"))
+			local writeSuccess = pcall(writefile, cachePath, content)
+			if writeSuccess then
+				local assetSuccess, asset = pcall(getcustomasset, cachePath)
+				if assetSuccess and type(asset) == "string" then
+					return asset
+				end
+			end
+		end
+	end
+
 	return nil
 end
 
@@ -801,11 +839,7 @@ function Sound:_resolveExternalFile(source, options)
 		baseName = sanitizeFileName((options and options.CacheKey) or source)
 	end
 
-	local folder = "StrataCache"
-	if type(makefolder) == "function" then
-		pcall(makefolder, folder)
-	end
-
+	local folder = ensureCacheFolder()
 	local filePath = string.format("%s/%s.%s", folder, sanitizeFileName(baseName), sanitizeFileName(extension))
 	local writeSuccess = pcall(writefile, filePath, content)
 	if not writeSuccess then
