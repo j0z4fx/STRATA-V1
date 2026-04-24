@@ -202,7 +202,7 @@ return function(Toolkit, Veil)
 		self.StatusChip = Veil.Instance:Create("TextLabel", {
 			Name = "StatusChip",
 			BackgroundColor3 = COLORS.Accent,
-			BackgroundTransparency = 0.84,
+			BackgroundTransparency = 0.8,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(14 + titleWidth + 4, 11),
 			Size = UDim2.fromOffset(chipWidth, 18),
@@ -210,7 +210,7 @@ return function(Toolkit, Veil)
 			Text = self.StatusText,
 			TextColor3 = COLORS.Accent,
 			TextSize = 12,
-			TextTransparency = 0.1,
+			TextTransparency = 0,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextYAlignment = Enum.TextYAlignment.Center,
 			ZIndex = 5,
@@ -219,6 +219,12 @@ return function(Toolkit, Veil)
 
 		Veil.Instance:Create("UICorner", {
 			CornerRadius = UDim.new(1, 0),
+			Parent = self.StatusChip,
+		})
+
+		Veil.Instance:Create("UIPadding", {
+			PaddingLeft = UDim.new(0, 2),
+			PaddingRight = UDim.new(0, 2),
 			Parent = self.StatusChip,
 		})
 
