@@ -227,15 +227,10 @@ local steps = {
 			context.Toolkit = loadstring(Fetch(TOOLKIT_URL))()
 		end,
 	},
-	{
-		Text = "Toolkit: resolving services",
-	},
-	{
-		Text = "Toolkit: initializing connections",
-	},
-	{
-		Text = "Toolkit: ready",
-	},
+	{ Text = "Toolkit: resolving services" },
+	{ Text = "Toolkit: initializing connections" },
+	{ Text = "Toolkit: ready" },
+
 	{
 		Text = "Loading Veil...",
 		Error = "[Strata Loader] Failed to load Veil",
@@ -244,18 +239,11 @@ local steps = {
 			context.Veil = veilFactory(context.Toolkit)
 		end,
 	},
-	{
-		Text = "Veil: initializing protection",
-	},
-	{
-		Text = "Veil: binding environment",
-	},
-	{
-		Text = "Veil: securing interfaces",
-	},
-	{
-		Text = "Veil: ready",
-	},
+	{ Text = "Veil: initializing protection" },
+	{ Text = "Veil: binding environment" },
+	{ Text = "Veil: securing interfaces" },
+	{ Text = "Veil: ready" },
+
 	{
 		Text = "Loading Axis...",
 		Error = "[Strata Loader] Failed to load Axis",
@@ -268,6 +256,7 @@ local steps = {
 			end
 		end,
 	},
+
 	{
 		Text = "Axis: building interface",
 		Error = "[Strata Loader] Failed to initialize Axis shell",
@@ -275,9 +264,9 @@ local steps = {
 			context.Axis:CreateWindow({})
 		end,
 	},
-	{
-		Text = "Axis: constructing layout",
-	},
+
+	{ Text = "Axis: constructing layout" },
+
 	{
 		Text = "Axis: registering tabs",
 		Error = "[Strata Loader] Failed to initialize tabs",
@@ -287,99 +276,119 @@ local steps = {
 				Icon = "house",
 			})
 
-			homeTab.Columns.leftColumn:Label({
-				Text = "Example Label",
-			})
+			local left = homeTab.Columns.leftColumn
+			local middle = homeTab.Columns.middleColumn
+			local right = homeTab.Columns.rightColumn
 
-			homeTab.Columns.leftColumn:Label({
-				Text = "Example Label",
-				Subtext = "With Subtext",
-			})
+			left:SectionHeader("Toggles")
 
-			homeTab.Columns.leftColumn:Divider()
-			homeTab.Columns.leftColumn:SectionHeader("Section Header")
-
-			local exampleToggle = homeTab:CreateToggle({
+			local toggle = homeTab:CreateToggle({
 				Text = "Example Toggle",
 				Tooltip = "Example Tooltip",
 				Default = false,
 				Column = "left",
 			})
 
-			local exampleToggleWithSubtext = homeTab:CreateToggle({
+			local toggleWithSubtext = homeTab:CreateToggle({
 				Text = "Example Toggle",
 				Subtext = "With Subtext",
 				Default = false,
 				Column = "left",
 			})
 
-			homeTab.Columns.leftColumn:Slider({
-				Name = "Sensitivity",
+			left:SectionHeader("Labels")
+
+			left:Label({
+				Text = "Example Label",
+			})
+
+			left:Label({
+				Text = "Example Label",
+				Subtext = "With Subtext",
+			})
+
+			left:Divider()
+
+			left:SectionHeader("Sliders")
+
+			left:Slider({
+				Name = "Example Slider",
 				Min = 0,
 				Max = 100,
 				Default = 50,
 				Step = 1,
 			})
 
-			homeTab.Columns.leftColumn:Slider({
-				Name = "Smoothing",
+			left:Slider({
+				Name = "Example Slider",
+				Subtext = "With Subtext",
 				Min = 0,
 				Max = 1,
 				Default = 0.5,
 				Step = 0.05,
-				Subtext = "Camera smoothing amount",
 			})
 
-			homeTab.Columns.middleColumn:SectionHeader("Text Elements")
-			homeTab.Columns.middleColumn:Label({
-				Text = "Static Label",
-			})
-			homeTab.Columns.middleColumn:Divider()
-			homeTab.Columns.middleColumn:Label({
-				Text = "Static Label",
-				Subtext = "Secondary description",
-			})
+			middle:SectionHeader("Notched Slider")
 
-			homeTab.Columns.middleColumn:NotchedSlider({
-				Name = "Quality",
+			middle:NotchedSlider({
+				Name = "Example Notched Slider",
 				Min = 1,
 				Max = 5,
 				Default = 3,
 				Step = 1,
 			})
 
-			homeTab.Columns.middleColumn:RangeSlider({
-				Name = "Distance Range",
+			middle:SectionHeader("Range Slider")
+
+			middle:RangeSlider({
+				Name = "Example Range Slider",
 				Min = 0,
 				Max = 500,
 				DefaultMin = 50,
 				DefaultMax = 250,
 				Step = 5,
-				Subtext = "Minimum and maximum range",
+				Subtext = "With Subtext",
 			})
 
-			homeTab.Columns.rightColumn:SectionHeader("Picker Examples")
+			middle:SectionHeader("Dropdowns")
 
-			local labelWithKeypicker = homeTab.Columns.rightColumn:Label({
+			middle:Dropdown({
+				Name = "Example Dropdown",
+				Items = { "Option 1", "Option 2", "Option 3" },
+				Default = "Option 1",
+			})
+
+			middle:Dropdown({
+				Name = "Example Dropdown",
+				Subtext = "With Subtext",
+				Items = { "Option 1", "Option 2", "Option 3" },
+				Default = "Option 1",
+			})
+
+			right:SectionHeader("Pickers")
+
+			local labelWithKeypicker = right:Label({
 				Text = "Example Label",
 			})
+
 			labelWithKeypicker:AddKeypicker({
 				Default = "E",
 			})
 
-			exampleToggle:AddKeypicker({
+			toggle:AddKeypicker({
 				Default = "Q",
 			})
 
-			local labelWithColorpicker = homeTab.Columns.rightColumn:Label({
+			local labelWithColorpicker = right:Label({
 				Text = "Example Label",
 				Subtext = "With Subtext",
 			})
+
 			labelWithColorpicker:AddColorpicker({
 				Default = Color3.fromRGB(242, 168, 190),
 			})
 
-			exampleToggleWithSubtext:AddColorpicker({
+			toggleWithSubtext:AddColorpicker({
 				Default = Color3.fromRGB(90, 171, 255),
 			})
 
@@ -395,6 +404,8 @@ local steps = {
 				PinnedBottom = true,
 			})
 
+			settingsTab.Columns.rightColumn:SectionHeader("Settings")
+
 			settingsTab.Columns.rightColumn:Dropdown({
 				Name = "Icon Pack",
 				Items = { "Lucide", "Phosphor" },
@@ -405,12 +416,10 @@ local steps = {
 			})
 		end,
 	},
-	{
-		Text = "Axis: ready",
-	},
-	{
-		Text = "Finalizing...",
-	},
+
+	{ Text = "Axis: ready" },
+	{ Text = "Finalizing..." },
+
 	{
 		Text = "Launching Strata",
 		Error = "[Strata Loader] Failed to show main UI",
