@@ -711,7 +711,8 @@ return function(Toolkit)
 	end
 
 	function SoundControl:Preload(source, options)
-		return self._toolkitSound:Preload(source, options)
+		local soundOptions = self:_buildOptions(options)
+		return self._toolkitSound:Preload(source, soundOptions)
 	end
 
 	function SoundControl:StopAll()
