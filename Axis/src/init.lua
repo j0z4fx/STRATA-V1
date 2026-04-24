@@ -90,6 +90,7 @@ return function(Toolkit, Veil)
 	local DropdownRowHeight = 30
 	local DropdownItemHeight = 26
 	local DropdownPanelPadding = 4
+	local DropdownPanelWidth = 200
 	local DropdownCornerRadius = 8
 	local DropdownItemSpacing = 2
 	local DropdownMaxVisibleItems = 7
@@ -2073,12 +2074,13 @@ return function(Toolkit, Veil)
 
 	function Window:_positionDropdownPanel(holder, panel, panelHeight)
 		local viewportSize = getViewportSize()
-		local width = math.max(holder.AbsoluteSize.X, 60)
+		local width = DropdownPanelWidth
 		local anchorPos = holder.AbsolutePosition
 		local anchorSize = holder.AbsoluteSize
 		local belowY = anchorPos.Y + anchorSize.Y + DropdownPanelGap
 		local aboveY = anchorPos.Y - panelHeight - DropdownPanelGap
-		local nextX = math.clamp(anchorPos.X, 10, math.max(10, viewportSize.X - width - 10))
+		local nextX = anchorPos.X + anchorSize.X - width
+		nextX = math.clamp(nextX, 10, math.max(10, viewportSize.X - width - 10))
 		local nextY
 		if belowY + panelHeight <= viewportSize.Y - 10 then
 			nextY = belowY
@@ -3439,13 +3441,13 @@ return function(Toolkit, Veil)
 			if self.Disabled then return end
 			Axis:_closeActivePicker(self.Panel)
 			Axis.ActivePickerPopup = self.Panel
+			local h = computePanelHeight()
+			self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
 			self.Panel.Visible = true
 			self.Panel:SetAttribute("AxisOpen", true)
 			if Axis.PickerBackdrop then
 				Axis.PickerBackdrop.Visible = true
 			end
-			local h = computePanelHeight()
-			self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
 			task.defer(function()
 				if self.Panel and self.Panel.Visible then
 					self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
