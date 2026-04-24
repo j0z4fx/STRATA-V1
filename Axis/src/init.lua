@@ -76,7 +76,6 @@ return function(Toolkit, Veil)
 	local PickerPreviewHeight = 22
 	local PickerCornerRadius = 10
 	local KeypickerModeMenuWidth = 86
-	local KeypickerModeRowHeight = 22
 	local DividerSnapThresholdScale = 0.02
 	local SliderRowHeight = 38
 	local SliderRowWithSubtextHeight = 54
@@ -98,14 +97,67 @@ return function(Toolkit, Veil)
 	local DropdownPanelGap = 4
 	local DropdownAnimTime = 0.16
 	local DropdownAnimSlide = 6
+	local COLORS = {
+		Window = Color3.fromRGB(19, 19, 22),
+		Titlebar = Color3.fromRGB(24, 24, 27),
+		Sidebar = Color3.fromRGB(17, 17, 19),
+		Stroke = Color3.fromRGB(255, 255, 255),
+		Text = Color3.fromRGB(238, 238, 242),
+		Accent = Color3.fromRGB(242, 168, 190),
+		ToggleOffBackground = Color3.fromRGB(36, 36, 41),
+		ToggleOffDot = Color3.fromRGB(68, 68, 78),
+		ToggleOnDot = Color3.fromRGB(255, 255, 255),
+	}
+	local IconTabRegistry: { any } = {}
+
+	local function normalizeIconAssetData(raw: any): { Image: string, ImageRectSize: Vector2, ImageRectOffset: Vector2 }?
+		if type(raw) ~= "table" then
+			return nil
+		end
+		local imageId = raw.Image or raw.image or raw.Url or raw.url
+		if type(imageId) ~= "string" or imageId == "" then
+			return nil
+		end
+		return {
+			Image = imageId,
+			ImageRectSize = raw.ImageRectSize or raw.imageRectSize or Vector2.zero,
+			ImageRectOffset = raw.ImageRectOffset or raw.imageRectOffset or Vector2.zero,
+		}
+	end
+
+	-- j0z4fx phosphor-roblox-direct uses per-icon name keys (e.g. house-line, gear-six); first arg to GetAsset is the exact key.
+	-- Add Lucide -> Phosphor aliases here when a tab icon does not share the same id.
+	local LUCIDE_TO_PHOSPHOR_ICON: { [string]: string } = {
+		house = "house-line",
+		["user-round"] = "user-circle",
+		settings = "gear-six",
+	}
+	local function getPhosphorNameCandidates(semantic: string): { string }
+		local key = string.lower(semantic)
+		local out: { string } = {}
+		local alias = LUCIDE_TO_PHOSPHOR_ICON[key]
+		if alias then
+			table.insert(out, alias)
+		end
+		table.insert(out, semantic)
+		if not string.find(semantic, "%-", 1, true) then
+			local suffixed = semantic .. "-line"
+			if suffixed ~= semantic then
+				table.insert(out, suffixed)
+			end
+		end
+		return out
+	end
+
 	local IconProvider = {
 		ActivePack = "Phosphor",
 		Packs = {},
-		Registry = setmetatable({}, { __mode = "k" })
 	}
 
 	function IconProvider:LoadLucide()
-		if self.Packs.Lucide then return self.Packs.Lucide end
+		if self.Packs.Lucide then
+			return self.Packs.Lucide
+		end
 		local success, source = pcall(game.HttpGet, game, "https://raw.githubusercontent.com/notpoiu/lucide-roblox-direct/main/source.lua")
 		if success and type(source) == "string" then
 			local compiled = loadstring(source)
@@ -121,7 +173,9 @@ return function(Toolkit, Veil)
 	end
 
 	function IconProvider:LoadPhosphor()
-		if self.Packs.Phosphor then return self.Packs.Phosphor end
+		if self.Packs.Phosphor then
+			return self.Packs.Phosphor
+		end
 		local success, source = pcall(game.HttpGet, game, "https://raw.githubusercontent.com/j0z4fx/phosphor-roblox-direct/master/source.lua")
 		if success and type(source) == "string" then
 			local compiled = loadstring(source)
@@ -136,68 +190,125 @@ return function(Toolkit, Veil)
 		return nil
 	end
 
-	function IconProvider:Get(name)
-		local pack = nil
-		if self.ActivePack == "Lucide" then
-			pack = self:LoadLucide()
-		else
-			pack = self:LoadPhosphor()
+	function IconProvider:Get(name, options: any?)
+		if type(name) ~= "string" or name == "" then
+			return nil
 		end
-		if pack and type(pack.GetAsset) == "function" then
-			local ok, asset = pcall(pack.GetAsset, name)
-			if ok and type(asset) == "table" then
-				return asset
+		local opts: any = type(options) == "table" and options or {}
+		local phosWeight: string? = if type(opts.Weight) == "string" then opts.Weight elseif type(opts.weight) == "string" then opts.weight else nil
+		if self.ActivePack == "Lucide" then
+			local pack = self:LoadLucide()
+			if pack and type(pack.GetAsset) == "function" then
+				local ok, asset = pcall(pack.GetAsset, name)
+				if ok then
+					return normalizeIconAssetData(asset)
+				end
+			end
+			return nil
+		end
+		local pack = self:LoadPhosphor()
+		if not (pack and type(pack.GetAsset) == "function") then
+			return nil
+		end
+		local w: string = (phosWeight == "fill" or phosWeight == "regular") and phosWeight or "regular"
+		for _, cname in getPhosphorNameCandidates(name) do
+			local ok, raw = pcall(pack.GetAsset, cname, w)
+			if ok then
+				local n = normalizeIconAssetData(raw)
+				if n then
+					return n
+				end
+			end
+		end
+		-- If fill failed (some glyphs), fall back to regular for the same candidate set
+		if w == "fill" then
+			for _, cname in getPhosphorNameCandidates(name) do
+				local ok, raw = pcall(pack.GetAsset, cname, "regular")
+				if ok then
+					local n = normalizeIconAssetData(raw)
+					if n then
+						return n
+					end
+				end
 			end
 		end
 		return nil
 	end
 
-	function IconProvider:Apply(imageLabel, iconName, tintColor)
-		if not imageLabel then return false end
-		self.Registry[imageLabel] = { IconName = iconName, TintColor = tintColor }
-		
-		local asset = self:Get(iconName)
-		if asset then
-			imageLabel.Image = asset.Url or ""
-			imageLabel.ImageRectSize = asset.ImageRectSize or Vector2.zero
-			imageLabel.ImageRectOffset = asset.ImageRectOffset or Vector2.zero
-			imageLabel.ImageColor3 = tintColor or Color3.new(1, 1, 1)
-			imageLabel.Visible = true
-			return true
+	function IconProvider:RenderTabIcon(tab, isSelected: boolean)
+		if not tab or not tab.Button or not tab.Button.Parent then
+			return
 		end
-		
-		imageLabel.Visible = false
-		return false
+		local parent = tab.Button
+		for _, n in ipairs({ "IconVisual", "IconImage", "IconFallback" }) do
+			local old = parent:FindFirstChild(n)
+			if old then
+				Veil.Instance:SecureDestroy(old)
+			end
+		end
+		tab.IconVisual = nil
+		local tint: Color3 = (isSelected and COLORS.Accent) or InactiveIconColor
+		local options: { Weight: string }? = nil
+		if self.ActivePack == "Phosphor" then
+			options = { Weight = isSelected and "fill" or "regular" }
+		end
+		local data = self:Get(tab.Icon, options)
+		if data then
+			local im = Veil.Instance:Create("ImageLabel", {
+				Name = "IconVisual",
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Image = data.Image,
+				ImageColor3 = tint,
+				ImageRectSize = data.ImageRectSize,
+				ImageRectOffset = data.ImageRectOffset,
+				Position = UDim2.fromOffset(tab._iconPos, tab._iconPos),
+				Size = UDim2.fromOffset(tab._iconSize, tab._iconSize),
+				ScaleType = Enum.ScaleType.Fit,
+				ZIndex = 6,
+				Parent = parent,
+			})
+			tab.IconVisual = im
+			return
+		end
+		local textChar = (string.len(tab.Name) or 0) > 0 and string.upper(string.sub(tab.Name, 1, 1)) or "?"
+		local label = Veil.Instance:Create("TextLabel", {
+			Name = "IconVisual",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.fromOffset(0, 0),
+			Size = UDim2.fromOffset(TabButtonSize, TabButtonSize),
+			Text = textChar,
+			TextColor3 = tint,
+			TextSize = 12,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 6,
+			Parent = parent,
+		})
+		tab.IconVisual = label
 	end
 
-	function IconProvider:SetPack(packName)
-		if self.ActivePack == packName then return end
-		self.ActivePack = packName
-		for imageLabel, data in pairs(self.Registry) do
-			if imageLabel.Parent then
-				task.spawn(function()
-					self:Apply(imageLabel, data.IconName, data.TintColor)
-				end)
-			else
-				self.Registry[imageLabel] = nil
+	function IconProvider:RefreshAllTabIcons()
+		for _, tab in ipairs(IconTabRegistry) do
+			if tab and tab.Button and tab.Button.Parent and tab.Window then
+				local selected = tab.Window.SelectedTab
+				IconProvider:RenderTabIcon(tab, selected == tab)
 			end
 		end
 	end
 
+	function IconProvider:SetPack(packName: string)
+		if self.ActivePack == packName then
+			return
+		end
+		self.ActivePack = packName
+		IconProvider:RefreshAllTabIcons()
+	end
+
 	local Window = {}
 	Window.__index = Window
-
-	local COLORS = {
-		Window = Color3.fromRGB(19, 19, 22),
-		Titlebar = Color3.fromRGB(24, 24, 27),
-		Sidebar = Color3.fromRGB(17, 17, 19),
-		Stroke = Color3.fromRGB(255, 255, 255),
-		Text = Color3.fromRGB(238, 238, 242),
-		Accent = Color3.fromRGB(242, 168, 190),
-		ToggleOffBackground = Color3.fromRGB(36, 36, 41),
-		ToggleOffDot = Color3.fromRGB(68, 68, 78),
-		ToggleOnDot = Color3.fromRGB(255, 255, 255),
-	}
 
 	local STROKE_TRANSPARENCY = 0.935
 	local TOAST_LOCATIONS = {
@@ -315,8 +426,9 @@ return function(Toolkit, Veil)
 
 	local function getModeMenuHeight(modeCount)
 		local rows = math.max(1, modeCount or 0)
-		local spacing = math.max(0, rows - 1) * 2
-		return (rows * KeypickerModeRowHeight) + spacing + 8
+		return rows * DropdownItemHeight
+			+ math.max(0, rows - 1) * DropdownItemSpacing
+			+ DropdownPanelPadding * 2
 	end
 
 	local function createBorder(parent)
@@ -491,16 +603,17 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = targetTransparency,
 		}):Play()
 
-		if tab.IconImage.Visible then
-			TweenService:Create(tab.IconImage, TweenInfo.new(TabButtonAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-				ImageColor3 = tint,
-			}):Play()
-		end
-
-		if tab.IconFallback.Visible then
-			TweenService:Create(tab.IconFallback, TweenInfo.new(TabButtonAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-				TextColor3 = tint,
-			}):Play()
+		local v = tab.IconVisual
+		if v and v.Visible then
+			if v:IsA("ImageLabel") then
+				TweenService:Create(v, TweenInfo.new(TabButtonAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					ImageColor3 = tint,
+				}):Play()
+			elseif v:IsA("TextLabel") then
+				TweenService:Create(v, TweenInfo.new(TabButtonAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					TextColor3 = tint,
+				}):Play()
+			end
 		end
 	end
 
@@ -1682,10 +1795,13 @@ return function(Toolkit, Veil)
 		for _, entry in ipairs(self.Tabs) do
 			local isSelected = entry == tab
 			entry.Content.Visible = isSelected
-			setTabButtonVisual(entry, isSelected, COLORS)
 			if isSelected then
 				self.SelectedTab = entry
 			end
+		end
+		IconProvider:RefreshAllTabIcons()
+		for _, entry in ipairs(self.Tabs) do
+			setTabButtonVisual(entry, entry == self.SelectedTab, COLORS)
 		end
 
 		return self.SelectedTab
@@ -1708,6 +1824,8 @@ return function(Toolkit, Veil)
 		local baseIconSize = TabButtonSize - (TabIconInset * 2)
 		local iconSize = math.max(12, math.floor(baseIconSize * tab.IconScale + 0.5))
 		local iconPosition = math.floor((TabButtonSize - iconSize) * 0.5 + 0.5)
+		tab._iconSize = iconSize
+		tab._iconPos = iconPosition
 
 		local buttonParent = tab.PinnedBottom and self.BottomTabHost or self.TabList
 
@@ -1746,40 +1864,7 @@ return function(Toolkit, Veil)
 			Parent = tab.Highlight,
 		})
 		createCorner(tab.Highlight, TabCornerRadius)
-
-		tab.IconImage = Veil.Instance:Create("ImageLabel", {
-			Name = "IconImage",
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Image = "",
-			ImageColor3 = InactiveIconColor,
-			Position = UDim2.fromOffset(iconPosition, iconPosition),
-			Size = UDim2.fromOffset(iconSize, iconSize),
-			ZIndex = 6,
-			Visible = false,
-			Parent = tab.Button,
-		})
-
-		tab.IconFallback = Veil.Instance:Create("TextLabel", {
-			Name = "IconFallback",
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Font = Enum.Font.GothamMedium,
-			Position = UDim2.fromOffset(0, 0),
-			Size = UDim2.fromOffset(TabButtonSize, TabButtonSize),
-			Text = string.upper(string.sub(tab.Name, 1, 1)),
-			TextColor3 = InactiveIconColor,
-			TextSize = 12,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			TextYAlignment = Enum.TextYAlignment.Center,
-			ZIndex = 6,
-			Visible = true,
-			Parent = tab.Button,
-		})
-
-		if IconProvider:Apply(tab.IconImage, tab.Icon, InactiveIconColor) then
-			tab.IconFallback.Visible = false
-		end
+		tab.IconVisual = nil
 
 		tab.Content = Veil.Instance:Create("Frame", {
 			Name = tab.Name .. "Content",
@@ -1890,11 +1975,13 @@ return function(Toolkit, Veil)
 			self:SelectTab(tab)
 		end)
 
+		table.insert(IconTabRegistry, tab)
 		table.insert(self.Tabs, tab)
-		setTabButtonVisual(tab, false, COLORS)
-
 		if not self.SelectedTab then
 			self:SelectTab(tab)
+		else
+			IconProvider:RenderTabIcon(tab, false)
+			setTabButtonVisual(tab, false, COLORS)
 		end
 
 		return tab
@@ -2094,37 +2181,21 @@ return function(Toolkit, Veil)
 		popup.Position = UDim2.fromOffset(nextX, nextY)
 	end
 
-	function Window:_positionMenuPopup(anchorButton, popup, width, height)
-		if not anchorButton or not popup then
+	-- PickerSurface-local placement: below anchor when possible, else above (same strategy as dropdown).
+	function Window:_positionPickerPanelBelowAnchor(anchor, panel, panelWidth, panelHeight)
+		if not anchor or not panel then
 			return
 		end
-
 		local viewportSize = getViewportSize()
-		local resolvedWidth = width or (popup.AbsoluteSize.X > 0 and popup.AbsoluteSize.X or KeypickerModeMenuWidth)
-		local resolvedHeight = height or (popup.AbsoluteSize.Y > 0 and popup.AbsoluteSize.Y or getModeMenuHeight(3))
-		local anchorPosition = anchorButton.AbsolutePosition
-		local anchorSize = anchorButton.AbsoluteSize
-		local nextX = anchorPosition.X + anchorSize.X - resolvedWidth
-		local nextY = anchorPosition.Y + anchorSize.Y + 6
-
-		nextX = math.clamp(nextX, 10, math.max(10, viewportSize.X - resolvedWidth - 10))
-		nextY = math.clamp(nextY, 10, math.max(10, viewportSize.Y - resolvedHeight - 10))
-
-		popup.Position = UDim2.fromOffset(nextX, nextY)
-	end
-
-	function Window:_positionDropdownPanel(holder, panel, panelHeight)
-		local viewportSize = getViewportSize()
-		local width = DropdownPanelWidth
-		local anchorPos = holder.AbsolutePosition
-		local anchorSize = holder.AbsoluteSize
+		local anchorPos = anchor.AbsolutePosition
+		local anchorSize = anchor.AbsoluteSize
 		local surfaceOffset = Axis.PickerSurface and Axis.PickerSurface.AbsolutePosition or Vector2.zero
 		local relX = anchorPos.X - surfaceOffset.X
 		local relY = anchorPos.Y - surfaceOffset.Y
 		local belowY = relY + anchorSize.Y + DropdownPanelGap
 		local aboveY = relY - panelHeight - DropdownPanelGap
-		local nextX = relX + anchorSize.X - width
-		nextX = math.clamp(nextX, 10, math.max(10, viewportSize.X - width - 10))
+		local nextX = relX + anchorSize.X - panelWidth
+		nextX = math.clamp(nextX, 10, math.max(10, viewportSize.X - panelWidth - 10))
 		local nextY
 		if belowY + panelHeight <= viewportSize.Y - 10 then
 			nextY = belowY
@@ -2133,8 +2204,12 @@ return function(Toolkit, Veil)
 		else
 			nextY = math.clamp(belowY, 10, math.max(10, viewportSize.Y - panelHeight - 10))
 		end
-		panel.Size = UDim2.fromOffset(width, panelHeight)
+		panel.Size = UDim2.fromOffset(panelWidth, panelHeight)
 		panel.Position = UDim2.fromOffset(nextX, nextY)
+	end
+
+	function Window:_positionDropdownPanel(holder, panel, panelHeight)
+		self:_positionPickerPanelBelowAnchor(holder, panel, DropdownPanelWidth, panelHeight)
 	end
 
 	function Window:_createKeypicker(control, options)
@@ -2203,16 +2278,16 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Size = UDim2.fromOffset(KeypickerModeMenuWidth, getModeMenuHeight(#allowedModes)),
 			Visible = false,
-			ZIndex = 260,
+			ZIndex = 244,
 			Parent = pickerSurface,
 		})
-		createCorner(keypicker.ModeMenu, 8)
-		createBorder(keypicker.ModeMenu)
-		createPadding(keypicker.ModeMenu, 4, 4, 4, 4)
+		createCorner(keypicker.ModeMenu, DropdownCornerRadius)
+		keypicker.ModeMenuBorder = createBorder(keypicker.ModeMenu)
+		createPadding(keypicker.ModeMenu, DropdownPanelPadding, DropdownPanelPadding, DropdownPanelPadding, DropdownPanelPadding)
 
 		Veil.Instance:Create("UIListLayout", {
 			FillDirection = Enum.FillDirection.Vertical,
-			Padding = UDim.new(0, 2),
+			Padding = UDim.new(0, DropdownItemSpacing),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Parent = keypicker.ModeMenu,
 		})
@@ -2236,16 +2311,18 @@ return function(Toolkit, Veil)
 				BackgroundColor3 = COLORS.ToggleOffBackground,
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
-				Size = UDim2.new(1, 0, 0, KeypickerModeRowHeight),
+				Size = UDim2.new(1, 0, 0, DropdownItemHeight),
 				Text = modeName,
 				TextColor3 = COLORS.Text,
-				TextSize = 12,
+				TextSize = 13,
 				TextTransparency = 0.18,
 				Font = Enum.Font.GothamMedium,
-				ZIndex = 261,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				ZIndex = 245,
 				Parent = keypicker.ModeMenu,
 			})
 			createCorner(modeButton, 6)
+			createPadding(modeButton, 0, 8, 0, 8)
 			keypicker.ModeButtons[modeName] = modeButton
 		end
 
@@ -2273,14 +2350,40 @@ return function(Toolkit, Veil)
 		end
 
 		function keypicker:CloseModeMenu()
-			if self.ModeMenu then
+			if not self.ModeMenu then
+				return
+			end
+			if self.ModeMenu:GetAttribute("AxisOpen") then
+				self.ModeMenu:SetAttribute("AxisOpen", false)
+				local currentPos = self.ModeMenu.Position
+				local finalPos = UDim2.fromOffset(currentPos.X.Offset, currentPos.Y.Offset - DropdownAnimSlide)
+				local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				local anim = TweenService:Create(self.ModeMenu, tweenInfo, {
+					BackgroundTransparency = 1,
+					Position = finalPos,
+				})
+				if self.ModeMenuBorder then
+					TweenService:Create(self.ModeMenuBorder, tweenInfo, {
+						Transparency = 1,
+					}):Play()
+				end
+				anim:Play()
+				anim.Completed:Connect(function()
+					if self.ModeMenu and not self.ModeMenu:GetAttribute("AxisOpen") then
+						self.ModeMenu.Visible = false
+						self.ModeMenu.Position = UDim2.fromOffset(-4000, -4000)
+					end
+				end)
+			else
 				self.ModeMenu.Visible = false
+				self.ModeMenu.Position = UDim2.fromOffset(-4000, -4000)
 			end
-			if Axis.ActiveModeMenu == self.ModeMenu then
-				Axis.ActiveModeMenu = nil
-			end
-			if not Axis.ActivePickerPopup and Axis.PickerBackdrop then
-				Axis.PickerBackdrop.Visible = false
+			if Axis.ActivePickerPopup == self.ModeMenu then
+				Axis.ActivePickerPopup = nil
+				Axis.ActivePickerClose = nil
+				if Axis.PickerBackdrop then
+					Axis.PickerBackdrop.Visible = false
+				end
 			end
 		end
 
@@ -2289,13 +2392,41 @@ return function(Toolkit, Veil)
 				return
 			end
 
-			Axis:_closeActivePicker()
-			Axis.ActiveModeMenu = self.ModeMenu
+			Axis:_closeActivePicker(self.ModeMenu)
+			Axis.ActivePickerPopup = self.ModeMenu
+			Axis.ActivePickerClose = function()
+				keypicker:CloseModeMenu()
+			end
+			self.ModeMenu.BackgroundTransparency = 1
+			if self.ModeMenuBorder then
+				self.ModeMenuBorder.Transparency = 1
+			end
+			self.ModeMenu.Position = UDim2.fromOffset(-4000, -4000)
 			self.ModeMenu.Visible = true
+			self.ModeMenu:SetAttribute("AxisOpen", true)
 			if Axis.PickerBackdrop then
 				Axis.PickerBackdrop.Visible = true
 			end
-			self.Window:_positionMenuPopup(self.Button, self.ModeMenu, KeypickerModeMenuWidth, getModeMenuHeight(#self.Modes))
+			task.spawn(function()
+				task.wait()
+				if not self.ModeMenu or not self.ModeMenu.Visible then
+					return
+				end
+				local h = getModeMenuHeight(#self.Modes)
+				self.Window:_positionPickerPanelBelowAnchor(self.Button, self.ModeMenu, KeypickerModeMenuWidth, h)
+				local finalPos = self.ModeMenu.Position
+				self.ModeMenu.Position = UDim2.fromOffset(finalPos.X.Offset, finalPos.Y.Offset - DropdownAnimSlide)
+				local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				TweenService:Create(self.ModeMenu, tweenInfo, {
+					BackgroundTransparency = 0,
+					Position = finalPos,
+				}):Play()
+				if self.ModeMenuBorder then
+					TweenService:Create(self.ModeMenuBorder, tweenInfo, {
+						Transparency = STROKE_TRANSPARENCY,
+					}):Play()
+				end
+			end)
 		end
 
 		function keypicker:SetMode(mode, setOptions)
@@ -2383,7 +2514,7 @@ return function(Toolkit, Veil)
 		end)
 
 		keypicker.Button.MouseButton2Click:Connect(function()
-			if keypicker.ModeMenu.Visible then
+			if keypicker.ModeMenu:GetAttribute("AxisOpen") then
 				keypicker:CloseModeMenu()
 			else
 				keypicker.Capturing = false
@@ -2431,7 +2562,7 @@ return function(Toolkit, Veil)
 				return
 			end
 
-			if keypicker.ModeMenu and keypicker.ModeMenu.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
+			if keypicker.ModeMenu and keypicker.ModeMenu:GetAttribute("AxisOpen") and input.UserInputType == Enum.UserInputType.MouseButton1 then
 				local point = input.Position
 				if not isPointInside(keypicker.ModeMenu, point) and not isPointInside(keypicker.Button, point) then
 					keypicker:CloseModeMenu()
@@ -3544,7 +3675,8 @@ return function(Toolkit, Veil)
 			end
 			if Axis.ActivePickerPopup == self.Panel then
 				Axis.ActivePickerPopup = nil
-				if Axis.PickerBackdrop and not Axis.ActiveModeMenu then
+				Axis.ActivePickerClose = nil
+				if Axis.PickerBackdrop then
 					Axis.PickerBackdrop.Visible = false
 				end
 			end
@@ -4330,10 +4462,6 @@ return function(Toolkit, Veil)
 				self.ActivePickerPopup:SetAttribute("AxisOpen", false)
 				self.ActivePickerPopup = nil
 			end
-			if self.ActiveModeMenu then
-				self.ActiveModeMenu.Visible = false
-				self.ActiveModeMenu = nil
-			end
 			self.PickerBackdrop.Visible = false
 		end)
 
@@ -4356,7 +4484,7 @@ return function(Toolkit, Veil)
 		
 		self.ActivePickerPopup = nil
 
-		if not self.ActiveModeMenu and self.PickerBackdrop then
+		if self.PickerBackdrop then
 			self.PickerBackdrop.Visible = false
 		end
 	end
@@ -4511,7 +4639,6 @@ return function(Toolkit, Veil)
 		self.ActiveOverlays = nil
 		self._overlayOrder = nil
 		self.ActivePickerPopup = nil
-		self.ActiveModeMenu = nil
 	end
 
 	function Axis:SetIconPack(packName)
