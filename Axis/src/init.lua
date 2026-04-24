@@ -605,16 +605,16 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Interactable = false,
-			Size = UDim2.fromOffset(17, 17),
+			Size = UDim2.fromOffset(13, 13),
 			ZIndex = 101,
 			Parent = self.Surface,
 		})
 
 		local cursorParts = {
-			{ Name = "VerticalStroke", Size = UDim2.fromOffset(5, 17), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 101 },
-			{ Name = "HorizontalStroke", Size = UDim2.fromOffset(17, 5), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 101 },
-			{ Name = "VerticalFill", Size = UDim2.fromOffset(3, 15), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 102 },
-			{ Name = "HorizontalFill", Size = UDim2.fromOffset(15, 3), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 102 },
+			{ Name = "VerticalStroke", Size = UDim2.fromOffset(3, 13), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 101 },
+			{ Name = "HorizontalStroke", Size = UDim2.fromOffset(13, 3), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 101 },
+			{ Name = "VerticalFill", Size = UDim2.fromOffset(1, 11), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 102 },
+			{ Name = "HorizontalFill", Size = UDim2.fromOffset(11, 1), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 102 },
 		}
 
 		for _, part in ipairs(cursorParts) do
