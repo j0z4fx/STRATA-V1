@@ -139,7 +139,7 @@ return function(Toolkit, Veil)
 		options = options or {}
 
 		local self = setmetatable({}, Window)
-		self.Title = options.Title or "Strata"
+		self.Title = "Strata"
 		self.StatusText = "Pre-Alpha"
 		self.Surface = Axis.Surface
 		self.Id = Toolkit.Util.GenerateId("AxisWindow")
@@ -189,41 +189,25 @@ return function(Toolkit, Veil)
 			Parent = self.Titlebar,
 		})
 
-		self.StatusChip = Veil.Instance:Create("Frame", {
+		self.StatusChip = Veil.Instance:Create("TextLabel", {
 			Name = "StatusChip",
 			BackgroundColor3 = COLORS.Accent,
 			BackgroundTransparency = 0.84,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(14 + titleWidth + 4, 11),
 			Size = UDim2.fromOffset(chipWidth, 18),
-			ZIndex = 5,
-			Parent = self.Titlebar,
-		})
-
-		createCorner(self.StatusChip, 4)
-
-		Veil.Instance:Create("UIPadding", {
-			PaddingLeft = UDim.new(0, 2),
-			PaddingRight = UDim.new(0, 2),
-			Parent = self.StatusChip,
-		})
-
-		self.StatusChipText = Veil.Instance:Create("TextLabel", {
-			Name = "Text",
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Size = UDim2.new(1, -4, 1, 0),
-			Position = UDim2.fromOffset(2, 0),
 			Text = self.StatusText,
 			TextColor3 = COLORS.Accent,
 			TextSize = 12,
 			TextTransparency = 0.1,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextYAlignment = Enum.TextYAlignment.Center,
-			ZIndex = 6,
-			Parent = self.StatusChip,
+			ZIndex = 5,
+			Parent = self.Titlebar,
 		})
+
+		createCorner(self.StatusChip, 4)
 
 		self.Body = Veil.Instance:Create("Frame", {
 			Name = "Body",
