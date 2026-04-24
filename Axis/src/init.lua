@@ -2178,9 +2178,9 @@ return function(Toolkit, Veil)
 			self.Button.Size = UDim2.fromOffset(width, AccessoryButtonHeight)
 			self.ButtonLabel.Text = self.Capturing and "..." or self.Value
 			self.Button.BackgroundColor3 = active and COLORS.Accent or COLORS.ToggleOffBackground
-			self.Button.BackgroundTransparency = self.Disabled and 0.2 or (active and 0.82 or 0)
-			self.ButtonLabel.TextTransparency = self.Disabled and 0.45 or 0.12
-			self.ButtonLabel.TextColor3 = self.Capturing and COLORS.Accent or (active and COLORS.Accent or COLORS.Text)
+			self.Button.BackgroundTransparency = self.Disabled and 0.2 or (active and 0.2 or 0)
+			self.ButtonLabel.TextTransparency = self.Disabled and 0.45 or (active and 0 or 0.12)
+			self.ButtonLabel.TextColor3 = self.Capturing and COLORS.Accent or (active and Color3.fromRGB(255, 255, 255) or COLORS.Text)
 			self:_refreshModeButtons()
 			refreshAccessoryWidth(control)
 		end
