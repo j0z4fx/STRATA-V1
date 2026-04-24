@@ -311,7 +311,7 @@ if context.Veil and context.Veil.Sound then
 
 		context.Veil.Sound:Play(LOAD_COMPLETE_SOUND, {
 			Name = "LoadComplete",
-			Volume = 0.45,
+			Volume = 0.9,
 			DestroyOnEnd = true,
 			CacheKey = "Strata.LoadComplete",
 		})
