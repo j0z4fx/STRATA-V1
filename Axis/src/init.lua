@@ -54,7 +54,7 @@ return function(Toolkit, Veil)
 	local ToggleRowWithSubtextHeight = 52
 	local ToggleSwitchWidth = 34
 	local ToggleSwitchHeight = 20
-	local ToggleDotSize = 15
+	local ToggleDotSize = 14
 	local ToggleAnimationTime = 0.22
 	local ToggleTooltipDelay = 0.8
 	local TooltipOffset = Vector2.new(16, -10)
@@ -72,6 +72,8 @@ return function(Toolkit, Veil)
 	local PickerHueWidth = 12
 	local PickerPreviewHeight = 22
 	local PickerCornerRadius = 10
+	local KeypickerModeMenuWidth = 86
+	local KeypickerModeRowHeight = 22
 	local Lucide
 
 	local function loadLucide()
@@ -535,6 +537,20 @@ return function(Toolkit, Veil)
 		end
 
 		return Vector2.new(1920, 1080)
+	end
+
+	local function isPointInside(guiObject, point)
+		if not guiObject or not point then
+			return false
+		end
+
+		local position = guiObject.AbsolutePosition
+		local size = guiObject.AbsoluteSize
+
+		return point.X >= position.X
+			and point.X <= position.X + size.X
+			and point.Y >= position.Y
+			and point.Y <= position.Y + size.Y
 	end
 
 	local function getControlTextRightInset(control)
@@ -1386,6 +1402,10 @@ return function(Toolkit, Veil)
 					if accessory.TriggeredSignal then
 						accessory.TriggeredSignal:Destroy()
 					end
+					if accessory.ModeMenu then
+						Veil.Instance:SecureDestroy(accessory.ModeMenu)
+						accessory.ModeMenu = nil
+					end
 					if accessory.Popup then
 						Veil.Instance:SecureDestroy(accessory.Popup)
 						accessory.Popup = nil
@@ -1891,27 +1911,66 @@ return function(Toolkit, Veil)
 		popup.Position = UDim2.fromOffset(nextX, nextY)
 	end
 
+	function Window:_positionMenuPopup(anchorButton, popup, width, height)
+		if not anchorButton or not popup then
+			return
+		end
+
+		local viewportSize = getViewportSize()
+		local resolvedWidth = width or (popup.AbsoluteSize.X > 0 and popup.AbsoluteSize.X or KeypickerModeMenuWidth)
+		local resolvedHeight = height or (popup.AbsoluteSize.Y > 0 and popup.AbsoluteSize.Y or (KeypickerModeRowHeight * 3))
+		local anchorPosition = anchorButton.AbsolutePosition
+		local anchorSize = anchorButton.AbsoluteSize
+		local nextX = anchorPosition.X + anchorSize.X - resolvedWidth
+		local nextY = anchorPosition.Y + anchorSize.Y + 6
+
+		nextX = math.clamp(nextX, 10, math.max(10, viewportSize.X - resolvedWidth - 10))
+		nextY = math.clamp(nextY, 10, math.max(10, viewportSize.Y - resolvedHeight - 10))
+
+		popup.Position = UDim2.fromOffset(nextX, nextY)
+	end
+
 	function Window:_createKeypicker(control, options)
 		options = options or {}
 
 		local host = ensureAccessoryHost(control)
 		local initialKey = normalizeKeyValue(options.Default or options.Key or "None")
+		local allowedModes = {}
+		for _, mode in ipairs(options.Modes or { "Always", "Hold", "Toggle" }) do
+			if type(mode) == "string" and mode ~= "" then
+				table.insert(allowedModes, mode)
+			end
+		end
+		if #allowedModes == 0 then
+			allowedModes = { "Always", "Hold", "Toggle" }
+		end
+
+		local requestedMode = tostring(options.Mode or "Toggle")
+		local resolvedMode = table.find(allowedModes, requestedMode) and requestedMode or "Toggle"
+		if not table.find(allowedModes, resolvedMode) then
+			resolvedMode = allowedModes[1]
+		end
 		local keypicker = {
 			Type = "Keypicker",
 			Window = self,
 			Control = control,
 			Value = initialKey,
+			Mode = resolvedMode,
+			Modes = allowedModes,
 			Disabled = options.Disabled == true,
 			Callback = options.Callback or options.ActivatedCallback,
 			ChangedCallback = options.ChangedCallback or options.OnChangedCallback,
 			ChangedSignal = Toolkit.Signal.new(),
 			TriggeredSignal = Toolkit.Signal.new(),
+			Held = false,
+			Toggled = false,
 			Capturing = false,
 		}
 
 		local displayText = keypicker.Value
 		local buttonWidth = math.max(KeypickerMinWidth, math.ceil(measureText(displayText, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding)
 		keypicker.Button = makeAccessoryButton(host, "Keypicker", buttonWidth)
+		keypicker.Button.Active = true
 		keypicker.Button.LayoutOrder = #host:GetChildren()
 		keypicker.ButtonLabel = Veil.Instance:Create("TextLabel", {
 			Name = "Label",
@@ -1930,19 +1989,133 @@ return function(Toolkit, Veil)
 		})
 		registerAccessory(control, buttonWidth)
 
+		local pickerSurface = Axis:_ensurePickerSurface()
+		keypicker.ModeMenu = Veil.Instance:Create("Frame", {
+			Name = "AxisKeypickerModeMenu",
+			BackgroundColor3 = COLORS.Window,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(KeypickerModeMenuWidth, (#allowedModes * KeypickerModeRowHeight) + 8),
+			Visible = false,
+			ZIndex = 260,
+			Parent = pickerSurface,
+		})
+		createCorner(keypicker.ModeMenu, 8)
+		createBorder(keypicker.ModeMenu)
+		createPadding(keypicker.ModeMenu, 4, 4, 4, 4)
+
+		Veil.Instance:Create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Vertical,
+			Padding = UDim.new(0, 2),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Parent = keypicker.ModeMenu,
+		})
+
+		keypicker.ModeButtons = {}
+
+		function keypicker:_refreshModeButtons()
+			for modeName, button in pairs(self.ModeButtons) do
+				local isSelected = modeName == self.Mode
+				button.BackgroundColor3 = isSelected and COLORS.Accent or COLORS.ToggleOffBackground
+				button.BackgroundTransparency = isSelected and 0.84 or 1
+				button.TextColor3 = isSelected and COLORS.Accent or COLORS.Text
+				button.TextTransparency = isSelected and 0.05 or 0.18
+			end
+		end
+
+		for _, modeName in ipairs(allowedModes) do
+			local modeButton = Veil.Instance:Create("TextButton", {
+				Name = modeName,
+				AutoButtonColor = false,
+				BackgroundColor3 = COLORS.ToggleOffBackground,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Size = UDim2.new(1, 0, 0, KeypickerModeRowHeight),
+				Text = modeName,
+				TextColor3 = COLORS.Text,
+				TextSize = 12,
+				TextTransparency = 0.18,
+				Font = Enum.Font.GothamMedium,
+				ZIndex = 261,
+				Parent = keypicker.ModeMenu,
+			})
+			createCorner(modeButton, 6)
+			keypicker.ModeButtons[modeName] = modeButton
+		end
+
+		function keypicker:GetState()
+			if self.Mode == "Always" then
+				return true
+			elseif self.Mode == "Hold" then
+				return self.Held
+			end
+
+			return self.Toggled
+		end
+
 		function keypicker:_refreshButton()
 			local width = math.max(KeypickerMinWidth, math.ceil(measureText(self.Capturing and "..." or self.Value, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding)
+			local active = self:GetState()
 			self.Button.Size = UDim2.fromOffset(width, AccessoryButtonHeight)
 			self.ButtonLabel.Text = self.Capturing and "..." or self.Value
-			self.Button.BackgroundTransparency = self.Disabled and 0.2 or 0
+			self.Button.BackgroundColor3 = active and COLORS.Accent or COLORS.ToggleOffBackground
+			self.Button.BackgroundTransparency = self.Disabled and 0.2 or (active and 0.82 or 0)
 			self.ButtonLabel.TextTransparency = self.Disabled and 0.45 or 0.12
-			self.ButtonLabel.TextColor3 = self.Capturing and COLORS.Accent or COLORS.Text
+			self.ButtonLabel.TextColor3 = self.Capturing and COLORS.Accent or (active and COLORS.Accent or COLORS.Text)
+			self:_refreshModeButtons()
 			refreshAccessoryWidth(control)
+		end
+
+		function keypicker:CloseModeMenu()
+			if self.ModeMenu then
+				self.ModeMenu.Visible = false
+			end
+		end
+
+		function keypicker:OpenModeMenu()
+			if self.Disabled or control.Disabled or not self.ModeMenu then
+				return
+			end
+
+			self.ModeMenu.Visible = true
+			self.Window:_positionMenuPopup(self.Button, self.ModeMenu, KeypickerModeMenuWidth, (#self.Modes * KeypickerModeRowHeight) + 8)
+		end
+
+		function keypicker:SetMode(mode, setOptions)
+			setOptions = setOptions or {}
+			if not table.find(self.Modes, mode) then
+				return self.Mode
+			end
+
+			local changed = mode ~= self.Mode
+			self.Mode = mode
+			if self.Mode == "Always" then
+				self.Held = false
+				self.Toggled = true
+			elseif self.Mode == "Hold" then
+				self.Held = false
+				self.Toggled = false
+			elseif self.Mode == "Toggle" then
+				self.Held = false
+				self.Toggled = false
+			end
+			self:_refreshButton()
+			if changed and setOptions.Silent ~= true then
+				self.TriggeredSignal:Fire(self:GetState(), self.Mode)
+			end
+
+			return self.Mode
+		end
+
+		function keypicker:GetMode()
+			return self.Mode
 		end
 
 		function keypicker:SetDisabled(disabled)
 			self.Disabled = disabled == true
 			self.Button.Active = not self.Disabled
+			if self.Disabled then
+				self:CloseModeMenu()
+			end
 			self:_refreshButton()
 		end
 
@@ -1977,8 +2150,8 @@ return function(Toolkit, Veil)
 		end
 
 		function keypicker:_activate(input)
-			safeCallback(self.Callback, self.Value, input)
-			self.TriggeredSignal:Fire(self.Value, input)
+			safeCallback(self.Callback, self:GetState(), self.Value, self.Mode, input)
+			self.TriggeredSignal:Fire(self:GetState(), self.Value, self.Mode, input)
 		end
 
 		keypicker.Button.MouseButton1Click:Connect(function()
@@ -1987,8 +2160,26 @@ return function(Toolkit, Veil)
 			end
 
 			keypicker.Capturing = true
+			keypicker:CloseModeMenu()
 			keypicker:_refreshButton()
 		end)
+
+		keypicker.Button.MouseButton2Click:Connect(function()
+			if keypicker.ModeMenu.Visible then
+				keypicker:CloseModeMenu()
+			else
+				keypicker.Capturing = false
+				keypicker:OpenModeMenu()
+				keypicker:_refreshButton()
+			end
+		end)
+
+		for modeName, modeButton in pairs(keypicker.ModeButtons) do
+			modeButton.MouseButton1Click:Connect(function()
+				keypicker:SetMode(modeName)
+				keypicker:CloseModeMenu()
+			end)
+		end
 
 		registerCleanup(self, UserInputService.InputBegan:Connect(function(input, processed)
 			if processed then
@@ -2022,15 +2213,48 @@ return function(Toolkit, Veil)
 				return
 			end
 
+			if keypicker.ModeMenu and keypicker.ModeMenu.Visible and input.UserInputType == Enum.UserInputType.MouseButton1 then
+				local point = input.Position
+				if not isPointInside(keypicker.ModeMenu, point) and not isPointInside(keypicker.Button, point) then
+					keypicker:CloseModeMenu()
+				end
+			end
+
 			if keypicker.Disabled or control.Disabled or UserInputService:GetFocusedTextBox() then
 				return
 			end
 
 			if keyMatchesInput(keypicker.Value, input) then
+				if keypicker.Mode == "Toggle" then
+					keypicker.Toggled = not keypicker.Toggled
+					keypicker:_refreshButton()
+					keypicker:_activate(input)
+				elseif keypicker.Mode == "Hold" then
+					if not keypicker.Held then
+						keypicker.Held = true
+						keypicker:_refreshButton()
+						keypicker:_activate(input)
+					end
+				elseif keypicker.Mode == "Always" then
+					keypicker:_refreshButton()
+					keypicker:_activate(input)
+				end
+			end
+		end))
+
+		registerCleanup(self, UserInputService.InputEnded:Connect(function(input)
+			if keypicker.Disabled or control.Disabled then
+				return
+			end
+
+			if keypicker.Mode == "Hold" and keyMatchesInput(keypicker.Value, input) and keypicker.Held then
+				keypicker.Held = false
+				keypicker:_refreshButton()
 				keypicker:_activate(input)
 			end
 		end))
 
+		keypicker:SetMode(keypicker.Mode, { Silent = true })
 		keypicker:SetDisabled(keypicker.Disabled)
 		table.insert(control.Tab.AccessoryControls, keypicker)
 		control.Keypicker = keypicker
@@ -2059,6 +2283,7 @@ return function(Toolkit, Veil)
 		colorpicker.Val = val
 
 		colorpicker.Button = makeAccessoryButton(host, "Colorpicker", ColorpickerButtonSize)
+		colorpicker.Button.Active = true
 		colorpicker.Button.LayoutOrder = #host:GetChildren()
 		colorpicker.ButtonSwatch = Veil.Instance:Create("Frame", {
 			Name = "Swatch",
@@ -2338,7 +2563,11 @@ return function(Toolkit, Veil)
 			end)
 		end
 
-		colorpicker.Button.MouseButton1Click:Connect(function()
+		colorpicker.Button.InputBegan:Connect(function(input)
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
+
 			if colorpicker.Popup.Visible then
 				colorpicker.Popup.Visible = false
 				Axis:_closeActivePicker()
@@ -2667,6 +2896,10 @@ return function(Toolkit, Veil)
 		end
 
 		toggle.Button.MouseButton1Click:Connect(function()
+			local mousePoint = UserInputService:GetMouseLocation()
+			if toggle.AccessoryHost and isPointInside(toggle.AccessoryHost, mousePoint) then
+				return
+			end
 			toggle:Toggle()
 		end)
 
