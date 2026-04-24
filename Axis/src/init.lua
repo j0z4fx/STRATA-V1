@@ -31,7 +31,7 @@ return function(Toolkit, Veil)
 	local ContentDividerHandleWidth = 4
 	local ContentDividerHandleHeight = 28
 	local MinColumnWidth = 150
-	local ResizeSmoothness = 0.18
+	local ResizeSmoothness = 0.12
 	local OverlaySpacing = 10
 	local OverlayAnimationTime = 0.28
 	local OverlayCornerRadius = 12
@@ -54,7 +54,7 @@ return function(Toolkit, Veil)
 	local ToggleRowWithSubtextHeight = 52
 	local ToggleSwitchWidth = 34
 	local ToggleSwitchHeight = 20
-	local ToggleDotSize = 14
+	local ToggleDotSize = 13
 	local ToggleAnimationTime = 0.22
 	local ToggleTooltipDelay = 0.8
 	local TooltipOffset = Vector2.new(16, -10)
@@ -74,6 +74,8 @@ return function(Toolkit, Veil)
 	local PickerCornerRadius = 10
 	local KeypickerModeMenuWidth = 86
 	local KeypickerModeRowHeight = 22
+	local KeypickerModeAffordanceWidth = 10
+	local DividerSnapThresholdScale = 0.02
 	local Lucide
 
 	local function loadLucide()
@@ -475,6 +477,43 @@ return function(Toolkit, Veil)
 		return divider, hitbox, line, handle
 	end
 
+	local function createSnapGuide(parent)
+		local guide = Veil.Instance:Create("Frame", {
+			Name = "DividerSnapGuide",
+			Active = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ClipsDescendants = true,
+			Size = UDim2.new(0, 10, 1, -(ContentDividerPaddingY * 2)),
+			Visible = false,
+			ZIndex = 3,
+			Parent = parent,
+		})
+
+		local dashLayout = Veil.Instance:Create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Vertical,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			Padding = UDim.new(0, 6),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Parent = guide,
+		})
+
+		for _ = 1, 20 do
+			Veil.Instance:Create("Frame", {
+				Name = "Dash",
+				BackgroundColor3 = COLORS.Accent,
+				BackgroundTransparency = 0.45,
+				BorderSizePixel = 0,
+				Size = UDim2.fromOffset(2, 8),
+				ZIndex = 3,
+				Parent = guide,
+			})
+		end
+
+		return guide, dashLayout
+	end
+
 	local function setDividerVisualState(layout, dividerIndex, isHeld)
 		local divider = layout.Dividers[dividerIndex]
 		local line = layout.Lines[dividerIndex]
@@ -487,6 +526,13 @@ return function(Toolkit, Veil)
 		line.BackgroundTransparency = transparency
 		handle.BackgroundColor3 = color
 		handle.BackgroundTransparency = transparency
+	end
+
+	local function setSnapGuideVisible(layout, dividerIndex, visible)
+		local guide = layout.Guides and layout.Guides[dividerIndex]
+		if guide then
+			guide.Visible = visible == true
+		end
 	end
 
 	local function ensureColumnStack(column)
@@ -753,6 +799,9 @@ return function(Toolkit, Veil)
 
 		for index, divider in ipairs(layout.Dividers) do
 			divider.Position = UDim2.new(boundaries[index], -(ContentDividerGrabWidth / 2), 0, ContentDividerPaddingY)
+			if layout.Guides and layout.Guides[index] then
+				layout.Guides[index].Position = UDim2.new(boundaries[index], -5, 0, ContentDividerPaddingY)
+			end
 		end
 	end
 
@@ -773,6 +822,7 @@ return function(Toolkit, Veil)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				if layout.ActiveDivider then
 					setDividerVisualState(layout, layout.ActiveDivider, false)
+					setSnapGuideVisible(layout, layout.ActiveDivider, false)
 				end
 				layout.ActiveDivider = nil
 			end
@@ -798,7 +848,15 @@ return function(Toolkit, Veil)
 			local currentTargets = layout.TargetBoundaries
 			local lowerBound = dividerIndex == 1 and minimumScale or (currentTargets[dividerIndex - 1] + minimumScale)
 			local upperBound = dividerIndex == #currentTargets and (1 - minimumScale) or (currentTargets[dividerIndex + 1] - minimumScale)
-			layout.TargetBoundaries[dividerIndex] = math.clamp(nextScale, lowerBound, upperBound)
+			local clamped = math.clamp(nextScale, lowerBound, upperBound)
+			local snapTarget = layout.DefaultBoundaries[dividerIndex]
+			if snapTarget and math.abs(clamped - snapTarget) <= DividerSnapThresholdScale then
+				layout.TargetBoundaries[dividerIndex] = snapTarget
+				setSnapGuideVisible(layout, dividerIndex, true)
+			else
+				layout.TargetBoundaries[dividerIndex] = clamped
+				setSnapGuideVisible(layout, dividerIndex, false)
+			end
 		end))
 	end
 
@@ -836,10 +894,12 @@ return function(Toolkit, Veil)
 			Mode = columnMode,
 			Columns = columns,
 			Dividers = {},
+			Guides = {},
 			Hitboxes = {},
 			Lines = {},
 			Handles = {},
 			Boundaries = columnMode == "Double" and { 0.5 } or { 1 / 3, 2 / 3 },
+			DefaultBoundaries = columnMode == "Double" and { 0.5 } or { 1 / 3, 2 / 3 },
 			CurrentBoundaries = columnMode == "Double" and { 0.5 } or { 1 / 3, 2 / 3 },
 			TargetBoundaries = columnMode == "Double" and { 0.5 } or { 1 / 3, 2 / 3 },
 			ActiveDivider = nil,
@@ -847,7 +907,9 @@ return function(Toolkit, Veil)
 
 		for dividerIndex = 1, #tab.ColumnLayout.Boundaries do
 			local divider, hitbox, line, handle = createContentDivider(parent)
+			local guide = createSnapGuide(parent)
 			tab.ColumnLayout.Dividers[dividerIndex] = divider
+			tab.ColumnLayout.Guides[dividerIndex] = guide
 			tab.ColumnLayout.Hitboxes[dividerIndex] = hitbox
 			tab.ColumnLayout.Lines[dividerIndex] = line
 			tab.ColumnLayout.Handles[dividerIndex] = handle
@@ -1968,7 +2030,7 @@ return function(Toolkit, Veil)
 		}
 
 		local displayText = keypicker.Value
-		local buttonWidth = math.max(KeypickerMinWidth, math.ceil(measureText(displayText, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding)
+		local buttonWidth = math.max(KeypickerMinWidth, math.ceil(measureText(displayText, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding + KeypickerModeAffordanceWidth)
 		keypicker.Button = makeAccessoryButton(host, "Keypicker", buttonWidth)
 		keypicker.Button.Active = true
 		keypicker.Button.LayoutOrder = #host:GetChildren()
@@ -1977,11 +2039,28 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Size = UDim2.fromScale(1, 1),
+			Size = UDim2.new(1, -KeypickerModeAffordanceWidth, 1, 0),
 			Text = displayText,
 			TextColor3 = COLORS.Text,
 			TextSize = 11,
 			TextTransparency = 0.12,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 11,
+			Parent = keypicker.Button,
+		})
+		keypicker.ModeAffordance = Veil.Instance:Create("TextLabel", {
+			Name = "ModeAffordance",
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.new(1, -4, 0.5, 0),
+			Size = UDim2.fromOffset(KeypickerModeAffordanceWidth, AccessoryButtonHeight),
+			Text = "v",
+			TextColor3 = COLORS.Text,
+			TextSize = 9,
+			TextTransparency = 0.35,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextYAlignment = Enum.TextYAlignment.Center,
 			ZIndex = 11,
@@ -2053,7 +2132,7 @@ return function(Toolkit, Veil)
 		end
 
 		function keypicker:_refreshButton()
-			local width = math.max(KeypickerMinWidth, math.ceil(measureText(self.Capturing and "..." or self.Value, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding)
+			local width = math.max(KeypickerMinWidth, math.ceil(measureText(self.Capturing and "..." or self.Value, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding + KeypickerModeAffordanceWidth)
 			local active = self:GetState()
 			self.Button.Size = UDim2.fromOffset(width, AccessoryButtonHeight)
 			self.ButtonLabel.Text = self.Capturing and "..." or self.Value
@@ -2061,6 +2140,8 @@ return function(Toolkit, Veil)
 			self.Button.BackgroundTransparency = self.Disabled and 0.2 or (active and 0.82 or 0)
 			self.ButtonLabel.TextTransparency = self.Disabled and 0.45 or 0.12
 			self.ButtonLabel.TextColor3 = self.Capturing and COLORS.Accent or (active and COLORS.Accent or COLORS.Text)
+			self.ModeAffordance.TextTransparency = self.Disabled and 0.55 or 0.35
+			self.ModeAffordance.TextColor3 = active and COLORS.Accent or COLORS.Text
 			self:_refreshModeButtons()
 			refreshAccessoryWidth(control)
 		end
@@ -2156,6 +2237,18 @@ return function(Toolkit, Veil)
 
 		keypicker.Button.MouseButton1Click:Connect(function()
 			if keypicker.Disabled or control.Disabled then
+				return
+			end
+
+			local mousePoint = UserInputService:GetMouseLocation()
+			if isPointInside(keypicker.ModeAffordance, mousePoint) then
+				keypicker.Capturing = false
+				if keypicker.ModeMenu.Visible then
+					keypicker:CloseModeMenu()
+				else
+					keypicker:OpenModeMenu()
+				end
+				keypicker:_refreshButton()
 				return
 			end
 
@@ -2296,6 +2389,16 @@ return function(Toolkit, Veil)
 			Parent = colorpicker.Button,
 		})
 		createCorner(colorpicker.ButtonSwatch, 4)
+		colorpicker.ButtonHitbox = Veil.Instance:Create("TextButton", {
+			Name = "ColorpickerHitbox",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			Text = "",
+			ZIndex = 12,
+			Parent = colorpicker.Button,
+		})
 		registerAccessory(control, ColorpickerButtonSize)
 
 		local pickerSurface = Axis:_ensurePickerSurface()
@@ -2563,8 +2666,8 @@ return function(Toolkit, Veil)
 			end)
 		end
 
-		colorpicker.Button.InputBegan:Connect(function(input)
-			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+		colorpicker.ButtonHitbox.MouseButton1Click:Connect(function()
+			if colorpicker.Disabled or control.Disabled then
 				return
 			end
 
@@ -2782,7 +2885,7 @@ return function(Toolkit, Veil)
 			visualOptions = visualOptions or {}
 			local instant = visualOptions.Instant == true
 			local disabled = self.Disabled
-			local dotOnX = ToggleSwitchWidth - ToggleDotSize - 2
+			local dotOnX = ToggleSwitchWidth - ToggleDotSize - 3
 			local dotOffX = 2
 			local targetBackground = value and COLORS.Accent or COLORS.ToggleOffBackground
 			local targetDotColor = value and COLORS.ToggleOnDot or COLORS.ToggleOffDot
@@ -2942,7 +3045,17 @@ return function(Toolkit, Veil)
 			return self.PickerSurface
 		end
 
-		self.PickerSurface = Veil.GUI:CreateSurface("AxisPickers")
+		self.PickerSurface = Veil.Instance:Create("Frame", {
+			Name = "AxisPickers",
+			Active = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ClipsDescendants = false,
+			Interactable = false,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 240,
+			Parent = self.Surface,
+		})
 		return self.PickerSurface
 	end
 

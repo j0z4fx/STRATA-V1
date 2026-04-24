@@ -132,7 +132,7 @@ createInstance("UICorner", {
 local barFill = createInstance("Frame", {
 	Name = "BarFill",
 	BackgroundColor3 = Accent,
-	BackgroundTransparency = 0.8,
+	BackgroundTransparency = 0.6,
 	BorderSizePixel = 0,
 	Size = UDim2.new(0, 0, 1, 0),
 	Parent = barTrack,
