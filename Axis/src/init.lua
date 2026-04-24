@@ -15,29 +15,95 @@ return function(Toolkit, Veil)
 
 	local COLORS = {
 		Window = Color3.fromRGB(19, 19, 22),
-		Titlebar = Color3.fromRGB(20, 20, 23),
-		Sidebar = Color3.fromRGB(17, 17, 20),
+		Titlebar = Color3.fromRGB(24, 24, 27),
+		Sidebar = Color3.fromRGB(17, 17, 19),
 		Stroke = Color3.fromRGB(255, 255, 255),
 		Text = Color3.fromRGB(255, 255, 255),
 	}
 
 	local STROKE_TRANSPARENCY = 0.935
 
-	local function createStroke(parent)
-		return Veil.Instance:Create("UIStroke", {
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			Color = COLORS.Stroke,
-			Transparency = STROKE_TRANSPARENCY,
-			Thickness = 1,
-			Parent = parent,
-		})
-	end
-
 	local function createCorner(parent, radius)
 		return Veil.Instance:Create("UICorner", {
 			CornerRadius = UDim.new(0, radius),
 			Parent = parent,
 		})
+	end
+
+	local function createStrokeLine(parent, size, position)
+		return Veil.Instance:Create("Frame", {
+			BackgroundColor3 = COLORS.Stroke,
+			BackgroundTransparency = STROKE_TRANSPARENCY,
+			BorderSizePixel = 0,
+			Position = position,
+			Size = size,
+			ZIndex = parent.ZIndex + 1,
+			Parent = parent,
+		})
+	end
+
+	local function buildTitlebarShell(parent)
+		local shell = Veil.Instance:Create("Frame", {
+			Name = "Shell",
+			BackgroundColor3 = COLORS.Titlebar,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 1, 0),
+			Parent = parent,
+		})
+
+		createCorner(shell, 14)
+
+		Veil.Instance:Create("Frame", {
+			Name = "BottomFill",
+			BackgroundColor3 = COLORS.Titlebar,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(0, 14),
+			Size = UDim2.new(1, 0, 1, -14),
+			Parent = shell,
+		})
+
+		createStrokeLine(parent, UDim2.new(1, -28, 0, 1), UDim2.fromOffset(14, 0))
+		createStrokeLine(parent, UDim2.new(1, 0, 0, 1), UDim2.new(0, 0, 1, -1))
+		createStrokeLine(parent, UDim2.new(0, 1, 1, -14), UDim2.fromOffset(0, 14))
+		createStrokeLine(parent, UDim2.new(0, 1, 1, -14), UDim2.new(1, -1, 0, 14))
+
+		return shell
+	end
+
+	local function buildSidebarShell(parent)
+		local shell = Veil.Instance:Create("Frame", {
+			Name = "Shell",
+			BackgroundColor3 = COLORS.Sidebar,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 1, 0),
+			Parent = parent,
+		})
+
+		createCorner(shell, 14)
+
+		Veil.Instance:Create("Frame", {
+			Name = "TopFill",
+			BackgroundColor3 = COLORS.Sidebar,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 0, 14),
+			Parent = shell,
+		})
+
+		Veil.Instance:Create("Frame", {
+			Name = "RightFill",
+			BackgroundColor3 = COLORS.Sidebar,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(14, 0),
+			Size = UDim2.new(1, -14, 1, 0),
+			Parent = shell,
+		})
+
+		createStrokeLine(parent, UDim2.new(1, 0, 0, 1), UDim2.fromOffset(0, 0))
+		createStrokeLine(parent, UDim2.new(0, 1, 1, 0), UDim2.new(1, -1, 0, 0))
+		createStrokeLine(parent, UDim2.new(0, 1, 1, -14), UDim2.fromOffset(0, 0))
+		createStrokeLine(parent, UDim2.new(1, -14, 0, 1), UDim2.new(0, 14, 1, -1))
+
+		return shell
 	end
 
 	function Window.new(options)
@@ -64,13 +130,13 @@ return function(Toolkit, Veil)
 
 		self.Titlebar = Veil.Instance:Create("Frame", {
 			Name = "Titlebar",
-			BackgroundColor3 = COLORS.Titlebar,
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Size = UDim2.new(1, 0, 0, 40),
 			Parent = self.Frame,
 		})
 
-		createStroke(self.Titlebar)
+		self.TitlebarShell = buildTitlebarShell(self.Titlebar)
 
 		self.TitlebarText = Veil.Instance:Create("TextLabel", {
 			Name = "Title",
@@ -99,13 +165,13 @@ return function(Toolkit, Veil)
 
 		self.Sidebar = Veil.Instance:Create("Frame", {
 			Name = "Sidebar",
-			BackgroundColor3 = COLORS.Sidebar,
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Size = UDim2.new(0, 42, 1, 0),
 			Parent = self.Body,
 		})
 
-		createStroke(self.Sidebar)
+		self.SidebarShell = buildSidebarShell(self.Sidebar)
 
 		self.Content = Veil.Instance:Create("Frame", {
 			Name = "Content",
