@@ -46,7 +46,7 @@ return function(Toolkit, Veil)
 	local ColumnPaddingX = 14
 	local ColumnPaddingY = 14
 	local ColumnItemSpacing = 10
-	local ToggleRowHeight = 38
+	local ToggleRowHeight = 30
 	local ToggleRowWithSubtextHeight = 52
 	local ToggleSwitchWidth = 34
 	local ToggleSwitchHeight = 20
@@ -1467,18 +1467,21 @@ return function(Toolkit, Veil)
 			Name = "LabelWrap",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(0, hasSubtext and 2 or 0),
-			Size = UDim2.new(1, -(ToggleSwitchWidth + 16), 1, hasSubtext and -4 or 0),
+			Position = hasSubtext and UDim2.fromOffset(0, 6) or UDim2.fromOffset(0, 0),
+			Size = hasSubtext
+				and UDim2.new(1, -(ToggleSwitchWidth + 16), 1, -12)
+				or UDim2.new(1, -(ToggleSwitchWidth + 16), 1, 0),
 			ZIndex = 5,
 			Parent = toggle.Holder,
 		})
 
 		toggle.TitleLabel = Veil.Instance:Create("TextLabel", {
 			Name = "Title",
+			AnchorPoint = hasSubtext and Vector2.new(0, 0) or Vector2.new(0, 0.5),
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = UDim2.fromOffset(0, 0),
+			Position = hasSubtext and UDim2.fromOffset(0, 0) or UDim2.new(0, 0, 0.5, 0),
 			Size = UDim2.new(1, 0, 0, 18),
 			Text = toggle.Text,
 			TextColor3 = COLORS.Text,
@@ -1511,10 +1514,10 @@ return function(Toolkit, Veil)
 
 		toggle.Switch = Veil.Instance:Create("Frame", {
 			Name = "Switch",
-			AnchorPoint = Vector2.new(1, 0.5),
+			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = COLORS.ToggleOffBackground,
 			BorderSizePixel = 0,
-			Position = UDim2.new(1, 0, 0.5, 0),
+			Position = UDim2.new(1, -(ToggleSwitchWidth * 0.5), 0.5, 0),
 			Size = UDim2.fromOffset(ToggleSwitchWidth, ToggleSwitchHeight),
 			ZIndex = 5,
 			Parent = toggle.Holder,

@@ -1,7 +1,11 @@
 local DEV = true
+local UPDATE_CHECK_ENABLED = true
+local UPDATE_CHECK_INTERVAL = 5
 local RAW_BASE_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main"
 local CDN_BASE_URL = "https://cdn.jsdelivr.net/gh/j0z4fx/STRATA-V1@main"
 local BASE_URL = DEV and RAW_BASE_URL or CDN_BASE_URL
+local LOADER_URL = RAW_BASE_URL .. "/Strata/Loader.lua"
+local UPDATE_VALUE_URL = RAW_BASE_URL .. "/Strata/build.txt"
 
 local TOOLKIT_URL = BASE_URL .. "/Toolkit/src/init.lua"
 local VEIL_URL = BASE_URL .. "/Veil/src/init.lua"
@@ -16,6 +20,23 @@ local TextColor = Color3.fromRGB(238, 238, 242)
 local SurfaceColor = Color3.fromRGB(19, 19, 22)
 local BarTrackColor = Color3.fromRGB(24, 24, 27)
 local TotalFakeDelay = 1.5
+local context = {}
+local GlobalEnv = (getgenv and getgenv()) or _G
+local ExistingRuntime = GlobalEnv.__STRATA_RUNTIME
+
+if type(ExistingRuntime) == "table" and type(ExistingRuntime.Cleanup) == "function" then
+	pcall(ExistingRuntime.Cleanup, "restart")
+end
+
+local Runtime = {
+	Id = string.format("StrataRuntime_%d_%d", os.time(), math.random(1000, 9999)),
+	Stopped = false,
+	Reloading = false,
+	CurrentBuildValue = nil,
+	Cleanup = nil,
+}
+
+GlobalEnv.__STRATA_RUNTIME = Runtime
 
 local function Fetch(url)
 	if DEV then
@@ -23,6 +44,10 @@ local function Fetch(url)
 	end
 
 	return game:HttpGet(url)
+end
+
+local function FetchFresh(url)
+	return game:HttpGet(url .. "?v=" .. tostring(os.time()))
 end
 
 local function getLoaderParent()
@@ -164,6 +189,28 @@ local function destroyLoader()
 	end
 end
 
+local function cleanupRuntime(reason)
+	if Runtime.Stopped then
+		return
+	end
+
+	Runtime.Stopped = true
+
+	if context and context.Axis and type(context.Axis.DestroyAll) == "function" then
+		pcall(function()
+			context.Axis:DestroyAll()
+		end)
+	end
+
+	destroyLoader()
+
+	if GlobalEnv.__STRATA_RUNTIME == Runtime and reason ~= "restart" then
+		GlobalEnv.__STRATA_RUNTIME = nil
+	end
+end
+
+Runtime.Cleanup = cleanupRuntime
+
 local function failLoader(message)
 	statusLabel.Text = message
 	percentLabel.Text = "ERR"
@@ -172,7 +219,6 @@ local function failLoader(message)
 	error(message, 0)
 end
 
-local context = {}
 local steps = {
 	{
 		Text = "Loading Toolkit...",
@@ -302,6 +348,100 @@ for index, step in ipairs(steps) do
 	end
 end
 
+local function readRemoteBuildValue()
+	local success, response = pcall(FetchFresh, UPDATE_VALUE_URL)
+	if not success or type(response) ~= "string" then
+		return nil
+	end
+
+	local normalized = response:gsub("^%s+", ""):gsub("%s+$", "")
+	if normalized == "" then
+		return nil
+	end
+
+	return normalized
+end
+
+local function reloadLatestLoader()
+	if Runtime.Reloading then
+		return
+	end
+
+	Runtime.Reloading = true
+
+	task.spawn(function()
+		task.wait(0.35)
+		if Runtime.Stopped then
+			return
+		end
+
+		local success, source = pcall(FetchFresh, LOADER_URL)
+		if not success or type(source) ~= "string" then
+			Runtime.Reloading = false
+			return
+		end
+
+		local compiled = loadstring(source)
+		if type(compiled) ~= "function" then
+			Runtime.Reloading = false
+			return
+		end
+
+		cleanupRuntime("reload")
+		pcall(compiled)
+	end)
+end
+
+local function startUpdateWatcher()
+	if not UPDATE_CHECK_ENABLED then
+		return
+	end
+
+	Runtime.CurrentBuildValue = readRemoteBuildValue()
+
+	task.spawn(function()
+		while not Runtime.Stopped do
+			task.wait(UPDATE_CHECK_INTERVAL)
+
+			if Runtime.Stopped then
+				break
+			end
+
+			local nextValue = readRemoteBuildValue()
+			if not nextValue then
+				continue
+			end
+
+			if Runtime.CurrentBuildValue == nil then
+				Runtime.CurrentBuildValue = nextValue
+				continue
+			end
+
+			if nextValue == Runtime.CurrentBuildValue then
+				continue
+			end
+
+			Runtime.CurrentBuildValue = nextValue
+
+			if context.Axis then
+				pcall(function()
+					context.Axis:Notify({
+						Title = "Strata Updated",
+						Message = "UI library update detected",
+						Duration = 3.5,
+						Location = "TopRight",
+					})
+				end)
+			end
+
+			if DEV then
+				reloadLatestLoader()
+				break
+			end
+		end
+	end)
+end
+
 task.wait(0.1)
 destroyLoader()
 
@@ -331,5 +471,7 @@ if context.Veil and context.Veil.Sound then
 		})
 	end)
 end
+
+startUpdateWatcher()
 
 return context.Axis
