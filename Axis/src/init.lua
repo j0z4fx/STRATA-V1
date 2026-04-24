@@ -39,8 +39,10 @@ return function(Toolkit, Veil)
 	local ToastWidth = 320
 	local NotificationWidth = 340
 	local WindowDragSmoothness = 0.1
-	local TabTransitionTime = 0.18
-	local TabTransitionDistance = 18
+	local TabButtonAnimationTime = 0.16
+	local TabButtonSelectedScale = 1
+	local TabButtonIdleScale = 0.94
+	local TabHighlightIdleScale = 0.82
 	local ColumnPaddingX = 14
 	local ColumnPaddingY = 14
 	local ColumnItemSpacing = 10
@@ -363,14 +365,36 @@ return function(Toolkit, Veil)
 
 	local function setTabButtonVisual(tab, isSelected, colors)
 		local tint = isSelected and colors.Accent or InactiveIconColor
-		tab.Highlight.BackgroundTransparency = isSelected and AccentTransparency or 1
+		local targetScale = isSelected and TabButtonSelectedScale or TabButtonIdleScale
+		local targetHighlightScale = isSelected and 1 or TabHighlightIdleScale
+		local targetTransparency = isSelected and AccentTransparency or 1
+
+		if tab.ButtonScale then
+			TweenService:Create(tab.ButtonScale, TweenInfo.new(TabButtonAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Scale = targetScale,
+			}):Play()
+		end
+
+		if tab.HighlightScale then
+			TweenService:Create(tab.HighlightScale, TweenInfo.new(TabButtonAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Scale = targetHighlightScale,
+			}):Play()
+		end
+
+		TweenService:Create(tab.Highlight, TweenInfo.new(TabButtonAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = targetTransparency,
+		}):Play()
 
 		if tab.IconImage.Visible then
-			tab.IconImage.ImageColor3 = tint
+			TweenService:Create(tab.IconImage, TweenInfo.new(TabButtonAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				ImageColor3 = tint,
+			}):Play()
 		end
 
 		if tab.IconFallback.Visible then
-			tab.IconFallback.TextColor3 = tint
+			TweenService:Create(tab.IconFallback, TweenInfo.new(TabButtonAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				TextColor3 = tint,
+			}):Play()
 		end
 	end
 
@@ -836,7 +860,6 @@ return function(Toolkit, Veil)
 		self.SelectedTab = nil
 		self.CleanupConnections = {}
 		self.CursorVisible = true
-		self.TabTransitionTweens = {}
 		self.TooltipToken = 0
 		self.ActiveTooltipAnchor = nil
 		self.ActiveTooltipText = nil
@@ -1250,79 +1273,19 @@ return function(Toolkit, Veil)
 		}):Play()
 	end
 
-	local function cancelTabTransition(self)
-		for _, tween in ipairs(self.TabTransitionTweens or {}) do
-			if tween and tween.Cancel then
-				tween:Cancel()
-			end
-		end
-
-		self.TabTransitionTweens = {}
-
-		for _, entry in ipairs(self.Tabs) do
-			entry.Content.Position = UDim2.fromOffset(0, 0)
-		end
-	end
-
 	function Window:SelectTab(tab)
 		if not tab or self.SelectedTab == tab then
 			return tab
 		end
 
-		cancelTabTransition(self)
-
-		local previousTab = self.SelectedTab
-		local direction = 1
-		if previousTab and previousTab.Order > tab.Order then
-			direction = -1
-		end
-
 		for _, entry in ipairs(self.Tabs) do
-			setTabButtonVisual(entry, entry == tab, COLORS)
-		end
-
-		if not previousTab then
-			tab.Content.Position = UDim2.fromOffset(0, 0)
-			tab.Content.Visible = true
-			self.SelectedTab = tab
-			return self.SelectedTab
-		end
-
-		if previousTab == tab then
-			return tab
-		end
-
-		previousTab.Content.Visible = true
-		previousTab.Content.Position = UDim2.fromOffset(0, 0)
-		tab.Content.Visible = true
-		tab.Content.Position = UDim2.fromOffset(direction * TabTransitionDistance, 0)
-		tab.Content.ZIndex = previousTab.Content.ZIndex + 1
-
-		local outgoingTween = TweenService:Create(previousTab.Content, TweenInfo.new(TabTransitionTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Position = UDim2.fromOffset(-(direction * TabTransitionDistance), 0),
-		})
-		local incomingTween = TweenService:Create(tab.Content, TweenInfo.new(TabTransitionTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-			Position = UDim2.fromOffset(0, 0),
-		})
-
-		table.insert(self.TabTransitionTweens, outgoingTween)
-		table.insert(self.TabTransitionTweens, incomingTween)
-
-		local completionConnection
-		completionConnection = incomingTween.Completed:Connect(function()
-			if completionConnection then
-				completionConnection:Disconnect()
+			local isSelected = entry == tab
+			entry.Content.Visible = isSelected
+			setTabButtonVisual(entry, isSelected, COLORS)
+			if isSelected then
+				self.SelectedTab = entry
 			end
-			previousTab.Content.Visible = false
-			previousTab.Content.Position = UDim2.fromOffset(0, 0)
-			tab.Content.Position = UDim2.fromOffset(0, 0)
-			tab.Content.ZIndex = 2
-			self.TabTransitionTweens = {}
-		end)
-
-		outgoingTween:Play()
-		incomingTween:Play()
-		self.SelectedTab = tab
+		end
 
 		return self.SelectedTab
 	end
@@ -1357,6 +1320,10 @@ return function(Toolkit, Veil)
 			ZIndex = 5,
 			Parent = buttonParent,
 		})
+		tab.ButtonScale = Veil.Instance:Create("UIScale", {
+			Scale = TabButtonIdleScale,
+			Parent = tab.Button,
+		})
 
 		if tab.PinnedBottom then
 			tab.Button.AnchorPoint = Vector2.new(0.5, 0)
@@ -1371,6 +1338,10 @@ return function(Toolkit, Veil)
 			Size = UDim2.fromOffset(TabButtonSize, TabButtonSize),
 			ZIndex = 5,
 			Parent = tab.Button,
+		})
+		tab.HighlightScale = Veil.Instance:Create("UIScale", {
+			Scale = TabHighlightIdleScale,
+			Parent = tab.Highlight,
 		})
 		createCorner(tab.Highlight, TabCornerRadius)
 

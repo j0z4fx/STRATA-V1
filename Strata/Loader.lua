@@ -236,9 +236,23 @@ local steps = {
 		Text = "Axis: registering tabs",
 		Error = "[Strata Loader] Failed to initialize tabs",
 		Run = function()
-			context.Axis:CreateTab({
+			local homeTab = context.Axis:CreateTab({
 				Name = "Home",
 				Icon = "house",
+			})
+
+			homeTab:CreateToggle({
+				Text = "Example Toggle",
+				Tooltip = "Example Tooltip",
+				Default = false,
+				Column = "left",
+			})
+
+			homeTab:CreateToggle({
+				Text = "Example Toggle",
+				Subtext = "With Subtext",
+				Default = false,
+				Column = "left",
 			})
 
 			context.Axis:CreateTab({
