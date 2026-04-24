@@ -9,6 +9,7 @@ local Accent = Color3.fromRGB(242, 168, 190)
 local TextColor = Color3.fromRGB(238, 238, 242)
 local SurfaceColor = Color3.fromRGB(19, 19, 22)
 local BarTrackColor = Color3.fromRGB(24, 24, 27)
+local TotalFakeDelay = 1.5
 
 local function getLoaderParent()
 	local player = Players.LocalPlayer
@@ -157,71 +158,92 @@ local function failLoader(message)
 	error(message, 0)
 end
 
-updateLoader("Loading Toolkit", 12)
-local okToolkit, Toolkit = pcall(function()
-	return loadstring(game:HttpGet(TOOLKIT_URL))()
-end)
-if not okToolkit then
-	failLoader("[Strata Loader] Failed to load Toolkit")
-end
+local context = {}
+local steps = {
+	{
+		Text = "Loading Toolkit",
+		Percent = 12,
+		Error = "[Strata Loader] Failed to load Toolkit",
+		Run = function()
+			context.Toolkit = loadstring(game:HttpGet(TOOLKIT_URL))()
+		end,
+	},
+	{
+		Text = "Loading Veil",
+		Percent = 32,
+		Error = "[Strata Loader] Failed to load Veil",
+		Run = function()
+			context.Veil = loadstring(game:HttpGet(VEIL_URL))()(context.Toolkit)
+		end,
+	},
+	{
+		Text = "Loading Axis",
+		Percent = 52,
+		Error = "[Strata Loader] Failed to load Axis",
+		Run = function()
+			context.Axis = loadstring(game:HttpGet(AXIS_URL))()(context.Toolkit, context.Veil)
 
-updateLoader("Loading Veil", 32)
-local okVeil, Veil = pcall(function()
-	return loadstring(game:HttpGet(VEIL_URL))()(Toolkit)
-end)
-if not okVeil then
-	failLoader("[Strata Loader] Failed to load Veil")
-end
+			if context.Axis and context.Axis.Surface and context.Axis.Surface:IsA("ScreenGui") then
+				context.Axis.Surface.Enabled = false
+			end
+		end,
+	},
+	{
+		Text = "Initializing Axis shell",
+		Percent = 72,
+		Error = "[Strata Loader] Failed to initialize Axis shell",
+		Run = function()
+			context.Axis:CreateWindow({})
+		end,
+	},
+	{
+		Text = "Initializing tabs and settings",
+		Percent = 90,
+		Error = "[Strata Loader] Failed to initialize tabs",
+		Run = function()
+			context.Axis:CreateTab({
+				Name = "Home",
+				Icon = "house",
+			})
 
-updateLoader("Loading Axis", 52)
-local okAxis, Axis = pcall(function()
-	return loadstring(game:HttpGet(AXIS_URL))()(Toolkit, Veil)
-end)
-if not okAxis then
-	failLoader("[Strata Loader] Failed to load Axis")
-end
+			context.Axis:CreateTab({
+				Name = "Profile",
+				Icon = "user-round",
+			})
 
-if Axis and Axis.Surface and Axis.Surface:IsA("ScreenGui") then
-	Axis.Surface.Enabled = false
-end
+			context.Axis:CreateTab({
+				Name = "Settings",
+				Icon = "settings",
+				IconScale = 0.8,
+				PinnedBottom = true,
+			})
+		end,
+	},
+	{
+		Text = "Showing main UI",
+		Percent = 100,
+		Error = "[Strata Loader] Failed to show main UI",
+		Run = function()
+			if context.Axis and context.Axis.Surface and context.Axis.Surface:IsA("ScreenGui") then
+				context.Axis.Surface.Enabled = true
+			end
+		end,
+	},
+}
 
-updateLoader("Initializing Axis shell", 72)
-local okWindow = pcall(function()
-	Axis:CreateWindow({})
-end)
-if not okWindow then
-	failLoader("[Strata Loader] Failed to initialize Axis shell")
-end
+local perStepDelay = TotalFakeDelay / #steps
 
-updateLoader("Initializing tabs and settings", 90)
-local okTabs = pcall(function()
-	Axis:CreateTab({
-		Name = "Home",
-		Icon = "house",
-	})
+for _, step in ipairs(steps) do
+	updateLoader(step.Text, step.Percent)
+	task.wait(perStepDelay)
 
-	Axis:CreateTab({
-		Name = "Profile",
-		Icon = "user-round",
-	})
-
-	Axis:CreateTab({
-		Name = "Settings",
-		Icon = "settings",
-		IconScale = 0.8,
-		PinnedBottom = true,
-	})
-end)
-if not okTabs then
-	failLoader("[Strata Loader] Failed to initialize tabs")
-end
-
-updateLoader("Showing main UI", 100)
-if Axis and Axis.Surface and Axis.Surface:IsA("ScreenGui") then
-	Axis.Surface.Enabled = true
+	local ok = pcall(step.Run)
+	if not ok then
+		failLoader(step.Error)
+	end
 end
 
 task.wait(0.1)
 destroyLoader()
 
-return Axis
+return context.Axis
