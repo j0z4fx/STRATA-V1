@@ -148,21 +148,31 @@ return function(Toolkit, Veil)
 		self.Frame = Veil.Instance:Create("Frame", {
 			Name = "Window",
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			BackgroundColor3 = COLORS.Window,
+			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			ClipsDescendants = true,
 			Position = UDim2.fromScale(0.5, 0.5),
 			Size = UDim2.fromOffset(960, 540),
 			Parent = self.Surface,
 		})
 
-		createCorner(self.Frame, 14)
+		self.WindowBackground = Veil.Instance:Create("Frame", {
+			Name = "WindowBackground",
+			BackgroundColor3 = COLORS.Window,
+			BorderSizePixel = 0,
+			ClipsDescendants = true,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 1,
+			Parent = self.Frame,
+		})
+
+		createCorner(self.WindowBackground, 14)
 
 		self.Titlebar = Veil.Instance:Create("Frame", {
 			Name = "Titlebar",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Size = UDim2.new(1, 0, 0, 40),
+			ZIndex = 2,
 			Parent = self.Frame,
 		})
 
@@ -214,11 +224,11 @@ return function(Toolkit, Veil)
 
 		self.Body = Veil.Instance:Create("Frame", {
 			Name = "Body",
-			BackgroundColor3 = COLORS.Window,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(0, 40),
 			Size = UDim2.new(1, 0, 1, -40),
+			ZIndex = 2,
 			Parent = self.Frame,
 		})
 
@@ -227,6 +237,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Size = UDim2.new(0, 42, 1, 0),
+			ZIndex = 2,
 			Parent = self.Body,
 		})
 
@@ -234,11 +245,11 @@ return function(Toolkit, Veil)
 
 		self.Content = Veil.Instance:Create("Frame", {
 			Name = "Content",
-			BackgroundColor3 = COLORS.Window,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(42, 0),
 			Size = UDim2.new(1, -42, 1, 0),
+			ZIndex = 2,
 			Parent = self.Body,
 		})
 
