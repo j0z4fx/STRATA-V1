@@ -1,0 +1,644 @@
+local HttpService = game:GetService("HttpService")
+
+local Util = {}
+
+function Util.IsCallable(value)
+	return type(value) == "function"
+end
+
+function Util.Try(callback, ...)
+	if not Util.IsCallable(callback) then
+		return false, "Expected callback to be a function"
+	end
+
+	return pcall(callback, ...)
+end
+
+function Util.TableShallowCopy(source)
+	local copy = {}
+	if type(source) ~= "table" then
+		return copy
+	end
+
+	for key, value in pairs(source) do
+		copy[key] = value
+	end
+
+	return copy
+end
+
+function Util.TableDeepCopy(source, seen)
+	if type(source) ~= "table" then
+		return source
+	end
+
+	seen = seen or {}
+	if seen[source] then
+		return seen[source]
+	end
+
+	local copy = {}
+	seen[source] = copy
+
+	for key, value in pairs(source) do
+		copy[Util.TableDeepCopy(key, seen)] = Util.TableDeepCopy(value, seen)
+	end
+
+	return copy
+end
+
+function Util.Assign(target, ...)
+	target = target or {}
+
+	for index = 1, select("#", ...) do
+		local source = select(index, ...)
+		if type(source) == "table" then
+			for key, value in pairs(source) do
+				target[key] = value
+			end
+		end
+	end
+
+	return target
+end
+
+function Util.ClearTable(target)
+	if type(target) ~= "table" then
+		return target
+	end
+
+	for key in pairs(target) do
+		target[key] = nil
+	end
+
+	return target
+end
+
+function Util.RandomString(length)
+	length = math.max(1, tonumber(length) or 12)
+
+	local characters = table.create(length)
+	for index = 1, length do
+		characters[index] = string.char(math.random(48, 122))
+	end
+
+	return table.concat(characters)
+end
+
+function Util.GenerateId(prefix)
+	prefix = prefix or "id"
+
+	local success, guid = pcall(HttpService.GenerateGUID, HttpService, false)
+	if success and type(guid) == "string" then
+		return string.format("%s_%s", prefix, guid:gsub("%-", ""))
+	end
+
+	return string.format("%s_%s", prefix, Util.RandomString(16))
+end
+
+local Services = {}
+Services.__index = Services
+
+function Services.new(options)
+	local self = setmetatable({}, Services)
+	self._cache = {}
+	self._strict = options and options.Strict or false
+
+	return self
+end
+
+function Services:SetStrict(enabled)
+	self._strict = not not enabled
+end
+
+function Services:Get(name)
+	if self._cache[name] then
+		return self._cache[name]
+	end
+
+	local success, service = pcall(game.GetService, game, name)
+	if success then
+		self._cache[name] = service
+		return service
+	end
+
+	if self._strict then
+		error(string.format("[Toolkit.Services] Failed to resolve service '%s'", tostring(name)))
+	end
+
+	return nil
+end
+
+function Services:Require(name)
+	local service = self:Get(name)
+	assert(service, string.format("[Toolkit.Services] Missing service '%s'", tostring(name)))
+
+	return service
+end
+
+local Connections = {}
+Connections.__index = Connections
+
+local function disconnect(connection)
+	if connection == nil then
+		return
+	end
+
+	if typeof(connection) == "RBXScriptConnection" then
+		pcall(function()
+			connection:Disconnect()
+		end)
+		return
+	end
+
+	if type(connection) == "table" and type(connection.Disconnect) == "function" then
+		pcall(function()
+			connection:Disconnect()
+		end)
+	end
+end
+
+function Connections.new()
+	local self = setmetatable({}, Connections)
+	self._connections = {}
+
+	return self
+end
+
+function Connections:Track(connection)
+	self._connections[connection] = true
+	return connection
+end
+
+function Connections:Connect(signal, callback)
+	assert(signal and type(signal.Connect) == "function", "[Toolkit.Connections] Signal must support :Connect()")
+	assert(type(callback) == "function", "[Toolkit.Connections] Callback must be a function")
+
+	return self:Track(signal:Connect(callback))
+end
+
+function Connections:Cleanup()
+	for connection in pairs(self._connections) do
+		disconnect(connection)
+		self._connections[connection] = nil
+	end
+end
+
+local InstanceManager = {}
+InstanceManager.__index = InstanceManager
+
+local function applyProperties(instance, properties)
+	if type(properties) ~= "table" then
+		return
+	end
+
+	for key, value in pairs(properties) do
+		if string.sub(key, 1, 1) ~= "_" then
+			instance[key] = value
+		end
+	end
+end
+
+function InstanceManager.new()
+	local self = setmetatable({}, InstanceManager)
+	self._tracked = {}
+
+	return self
+end
+
+function InstanceManager:Track(instance)
+	if instance then
+		self._tracked[instance] = true
+	end
+
+	return instance
+end
+
+function InstanceManager:Create(className, properties)
+	assert(type(className) == "string", "[Toolkit.Instance] className must be a string")
+
+	local instance = Instance.new(className)
+	applyProperties(instance, properties)
+
+	if not (type(properties) == "table" and properties._skipTrack) then
+		self:Track(instance)
+	end
+
+	return instance
+end
+
+function InstanceManager:Destroy(instance)
+	if not instance then
+		return
+	end
+
+	self._tracked[instance] = nil
+
+	pcall(function()
+		instance.Parent = nil
+	end)
+
+	pcall(function()
+		instance:Destroy()
+	end)
+end
+
+function InstanceManager:Cleanup()
+	local tracked = Util.TableShallowCopy(self._tracked)
+
+	for instance in pairs(tracked) do
+		self:Destroy(instance)
+	end
+end
+
+local Tasks = {}
+Tasks.__index = Tasks
+
+function Tasks.new()
+	local self = setmetatable({}, Tasks)
+	self._threads = {}
+
+	return self
+end
+
+function Tasks:_track(thread)
+	if thread ~= nil then
+		self._threads[thread] = true
+	end
+
+	return thread
+end
+
+function Tasks:_untrack(thread)
+	if thread ~= nil then
+		self._threads[thread] = nil
+	end
+end
+
+function Tasks:Spawn(callback, ...)
+	assert(type(callback) == "function", "[Toolkit.Tasks] Callback must be a function")
+
+	local args = table.pack(...)
+	local thread
+
+	thread = task.spawn(function()
+		local current = thread or coroutine.running()
+		xpcall(function()
+			callback(table.unpack(args, 1, args.n))
+		end, debug.traceback)
+		self:_untrack(current)
+	end)
+
+	return self:_track(thread)
+end
+
+function Tasks:Delay(duration, callback, ...)
+	assert(type(callback) == "function", "[Toolkit.Tasks] Callback must be a function")
+
+	local args = table.pack(...)
+	local thread
+
+	thread = task.delay(duration, function()
+		local current = thread or coroutine.running()
+		xpcall(function()
+			callback(table.unpack(args, 1, args.n))
+		end, debug.traceback)
+		self:_untrack(current)
+	end)
+
+	return self:_track(thread)
+end
+
+function Tasks:Cancel(thread)
+	if not self._threads[thread] then
+		return false
+	end
+
+	self:_untrack(thread)
+	return pcall(task.cancel, thread)
+end
+
+function Tasks:Cleanup()
+	for thread in pairs(self._threads) do
+		pcall(task.cancel, thread)
+		self._threads[thread] = nil
+	end
+end
+
+local State = {}
+State.__index = State
+
+local Scope = {}
+Scope.__index = Scope
+
+local function getScopeContainer(state, key)
+	local container = state._store[key]
+	if type(container) ~= "table" then
+		container = {}
+		state._store[key] = container
+	end
+
+	return container
+end
+
+function State.new(seed)
+	local self = setmetatable({}, State)
+	self._store = type(seed) == "table" and seed or {}
+
+	return self
+end
+
+function State:Get(key, defaultValue)
+	local value = self._store[key]
+	if value == nil then
+		return defaultValue
+	end
+
+	return value
+end
+
+function State:Set(key, value)
+	self._store[key] = value
+	return value
+end
+
+function State:Delete(key)
+	local value = self._store[key]
+	self._store[key] = nil
+	return value
+end
+
+function State:Clear()
+	for key in pairs(self._store) do
+		self._store[key] = nil
+	end
+end
+
+function State:Scope(scopeKey)
+	return setmetatable({
+		_state = self,
+		_scopeKey = scopeKey,
+	}, Scope)
+end
+
+function Scope:Get(key, defaultValue)
+	local container = getScopeContainer(self._state, self._scopeKey)
+	local value = container[key]
+	if value == nil then
+		return defaultValue
+	end
+
+	return value
+end
+
+function Scope:Set(key, value)
+	local container = getScopeContainer(self._state, self._scopeKey)
+	container[key] = value
+	return value
+end
+
+function Scope:Delete(key)
+	local container = getScopeContainer(self._state, self._scopeKey)
+	local value = container[key]
+	container[key] = nil
+	return value
+end
+
+function Scope:Clear()
+	self._state._store[self._scopeKey] = {}
+end
+
+local Signal = {}
+Signal.__index = Signal
+
+local SignalConnection = {}
+SignalConnection.__index = SignalConnection
+
+function SignalConnection:Disconnect()
+	if not self.Connected then
+		return
+	end
+
+	self.Connected = false
+	self._signal._listeners[self] = nil
+end
+
+function Signal.new()
+	return setmetatable({
+		_destroyed = false,
+		_listeners = {},
+	}, Signal)
+end
+
+function Signal:Connect(callback)
+	assert(type(callback) == "function", "[Toolkit.Signal] Callback must be a function")
+	assert(not self._destroyed, "[Toolkit.Signal] Cannot connect to a destroyed signal")
+
+	local connection = setmetatable({
+		Connected = true,
+		Callback = callback,
+		_signal = self,
+	}, SignalConnection)
+
+	self._listeners[connection] = true
+	return connection
+end
+
+function Signal:Once(callback)
+	local connection
+
+	connection = self:Connect(function(...)
+		connection:Disconnect()
+		callback(...)
+	end)
+
+	return connection
+end
+
+function Signal:Fire(...)
+	if self._destroyed then
+		return
+	end
+
+	local args = table.pack(...)
+
+	for connection in pairs(self._listeners) do
+		if connection.Connected then
+			task.spawn(connection.Callback, table.unpack(args, 1, args.n))
+		end
+	end
+end
+
+function Signal:Wait()
+	local thread = coroutine.running()
+	local connection
+
+	connection = self:Connect(function(...)
+		connection:Disconnect()
+		task.spawn(thread, ...)
+	end)
+
+	return coroutine.yield()
+end
+
+function Signal:Destroy()
+	if self._destroyed then
+		return
+	end
+
+	self._destroyed = true
+
+	for connection in pairs(self._listeners) do
+		connection:Disconnect()
+	end
+end
+
+local Drag = {}
+Drag.__index = Drag
+
+local DragBinding = {}
+DragBinding.__index = DragBinding
+
+local function isPointerInput(input)
+	if not input then
+		return false
+	end
+
+	return input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch
+end
+
+local function disconnectAll(connections)
+	for key, connection in pairs(connections) do
+		disconnect(connection)
+		connections[key] = nil
+	end
+end
+
+function DragBinding:Disconnect()
+	if not self.Connected then
+		return
+	end
+
+	self.Connected = false
+	disconnectAll(self._connections)
+end
+
+function Drag.new(services)
+	local self = setmetatable({}, Drag)
+	self._services = services
+
+	return self
+end
+
+function Drag:Attach(handle, target, options)
+	assert(handle and handle:IsA("GuiObject"), "[Toolkit.Drag] Handle must be a GuiObject")
+	assert(target and target:IsA("GuiObject"), "[Toolkit.Drag] Target must be a GuiObject")
+
+	options = options or {}
+
+	local userInputService = self._services:Require("UserInputService")
+	local binding = setmetatable({
+		Connected = true,
+		_connections = {},
+	}, DragBinding)
+
+	local dragging = false
+	local dragInput
+	local dragStart
+	local startPosition
+
+	local function stopDragging()
+		dragging = false
+		dragInput = nil
+	end
+
+	local function updatePosition(input)
+		if not dragging or input ~= dragInput then
+			return
+		end
+
+		local delta = input.Position - dragStart
+		local offsetX = startPosition.X.Offset + delta.X
+		local offsetY = startPosition.Y.Offset + delta.Y
+
+		if options.ClampToParent and target.Parent and target.Parent:IsA("GuiObject") then
+			local parentSize = target.Parent.AbsoluteSize
+			offsetX = math.clamp(offsetX, 0, parentSize.X - target.AbsoluteSize.X)
+			offsetY = math.clamp(offsetY, 0, parentSize.Y - target.AbsoluteSize.Y)
+		end
+
+		target.Position = UDim2.new(
+			startPosition.X.Scale,
+			offsetX,
+			startPosition.Y.Scale,
+			offsetY
+		)
+	end
+
+	binding._connections.InputBegan = handle.InputBegan:Connect(function(input)
+		if not isPointerInput(input) then
+			return
+		end
+
+		dragging = true
+		dragInput = input
+		dragStart = input.Position
+		startPosition = target.Position
+
+		local inputEnded
+		inputEnded = input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				disconnect(inputEnded)
+				stopDragging()
+			end
+		end)
+
+		binding._connections.InputEnded = inputEnded
+	end)
+
+	binding._connections.InputChanged = handle.InputChanged:Connect(function(input)
+		if isPointerInput(input) or input.UserInputType == Enum.UserInputType.MouseMovement then
+			dragInput = input
+		end
+	end)
+
+	binding._connections.GlobalInputChanged = userInputService.InputChanged:Connect(function(input)
+		updatePosition(input)
+	end)
+
+	binding._connections.AncestryChanged = target.AncestryChanged:Connect(function(_, parent)
+		if parent == nil then
+			binding:Disconnect()
+		end
+	end)
+
+	return binding
+end
+
+local Toolkit = {
+	Util = Util,
+	Signal = Signal,
+	Modules = {
+		Services = Services,
+		Connections = Connections,
+		Instance = InstanceManager,
+		Tasks = Tasks,
+		State = State,
+	},
+}
+
+Toolkit.Services = Services.new()
+Toolkit.Connections = Connections.new()
+Toolkit.Instance = InstanceManager.new()
+Toolkit.Tasks = Tasks.new()
+Toolkit.State = State.new()
+Toolkit.Drag = Drag.new(Toolkit.Services)
+
+function Toolkit:Cleanup()
+	self.Connections:Cleanup()
+	self.Tasks:Cleanup()
+	self.Instance:Cleanup()
+end
+
+return Toolkit

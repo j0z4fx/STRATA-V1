@@ -1,0 +1,87 @@
+# System Architecture
+
+This project is composed of multiple core modules. Each module has a clearly defined responsibility and is designed to remain independent where possible.
+
+---
+
+## Axis
+UI Library
+
+Responsibilities:
+- Handles all user interface rendering
+- Provides components (toggles, sliders, groupboxes, tabs, etc.)
+- Manages layout, styling, and interaction
+- Exposes UI API to the rest of the system
+
+---
+
+## Kinetic
+Movement Engine
+
+Responsibilities:
+- Handles all movement-related logic
+- Processes velocity, prediction, and motion adjustments
+- Provides movement data to other systems
+
+---
+
+## Veil
+Protection / Safety Layer
+
+Responsibilities:
+- Acts as an abstraction layer for protection logic
+- Sanitizes or wraps sensitive operations
+- Provides safe interfaces for other modules
+- Centralizes protection-related behavior
+
+---
+
+## Insight
+Perception Engine
+
+Responsibilities:
+- Handles environment awareness
+- Collects and processes data about entities and surroundings
+- Provides structured data to other systems
+
+---
+
+## Focus
+Aim Engine
+
+Responsibilities:
+- Handles targeting and aim logic
+- Uses data from Insight
+- Applies calculations for precision and tracking
+
+---
+
+## Toolkit
+System Utilities / Manager
+
+Responsibilities:
+- Manages access to game services
+- Handles connections, events, and cleanup
+- Provides shared utilities used across modules
+- Acts as a backbone for system-level operations
+
+---
+
+## Strata
+Main Product / Orchestrator
+
+Responsibilities:
+- Integrates all modules together
+- Defines overall behavior and feature set
+- Coordinates communication between systems
+- Acts as the final layer exposed to the user
+
+---
+
+## Design Principles
+
+- Each module has a single, well-defined responsibility
+- Modules should be loosely coupled and reusable
+- Cross-module communication should be explicit and controlled
+- Core logic should not be duplicated across modules
+- Strata is the only layer that directly orchestrates everything
