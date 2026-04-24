@@ -723,6 +723,18 @@ local function extractFileName(path, fallbackName)
 	return sanitizeFileName(fileName or fallbackName or "sound")
 end
 
+local function resolveCustomAssetHandler()
+	if type(getcustomasset) == "function" then
+		return getcustomasset
+	end
+
+	if type(getsynasset) == "function" then
+		return getsynasset
+	end
+
+	return nil
+end
+
 local function getHttpContent(url)
 	if type(url) ~= "string" then
 		return nil
@@ -779,7 +791,8 @@ function Sound:_getSoundParent(options)
 end
 
 function Sound:_resolveLocalFile(source)
-	if type(getcustomasset) ~= "function" then
+	local customAsset = resolveCustomAssetHandler()
+	if type(customAsset) ~= "function" then
 		return nil
 	end
 
@@ -791,7 +804,7 @@ function Sound:_resolveLocalFile(source)
 	end
 
 	for _, path in ipairs({ source, string.gsub(source, "\\", "/") }) do
-		local success, asset = pcall(getcustomasset, path)
+		local success, asset = pcall(customAsset, path)
 		if success and type(asset) == "string" then
 			return asset
 		end
@@ -808,9 +821,11 @@ function Sound:_resolveLocalFile(source)
 			local cachePath = string.format("%s/%s", folder, extractFileName(path, "sound.mp3"))
 			local writeSuccess = pcall(writefile, cachePath, content)
 			if writeSuccess then
-				local assetSuccess, asset = pcall(getcustomasset, cachePath)
-				if assetSuccess and type(asset) == "string" then
-					return asset
+				for _, localPath in ipairs({ cachePath, string.gsub(cachePath, "\\", "/") }) do
+					local assetSuccess, asset = pcall(customAsset, localPath)
+					if assetSuccess and type(asset) == "string" then
+						return asset
+					end
 				end
 			end
 		end
@@ -820,7 +835,8 @@ function Sound:_resolveLocalFile(source)
 end
 
 function Sound:_resolveExternalFile(source, options)
-	if type(writefile) ~= "function" or type(getcustomasset) ~= "function" then
+	local customAsset = resolveCustomAssetHandler()
+	if type(writefile) ~= "function" or type(customAsset) ~= "function" then
 		return nil
 	end
 
@@ -846,9 +862,11 @@ function Sound:_resolveExternalFile(source, options)
 		return nil
 	end
 
-	local assetSuccess, asset = pcall(getcustomasset, filePath)
-	if assetSuccess and type(asset) == "string" then
-		return asset
+	for _, localPath in ipairs({ filePath, string.gsub(filePath, "\\", "/") }) do
+		local assetSuccess, asset = pcall(customAsset, localPath)
+		if assetSuccess and type(asset) == "string" then
+			return asset
+		end
 	end
 
 	return nil

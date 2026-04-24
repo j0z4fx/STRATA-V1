@@ -1187,7 +1187,8 @@ return function(Toolkit, Veil)
 
 		self.ActiveOverlays[entry.Id] = entry
 
-		task.defer(function()
+		task.spawn(function()
+			RunService.Heartbeat:Wait()
 			if entry.Destroyed or not entry.Card then
 				return
 			end
