@@ -15,13 +15,14 @@ Axis:CreateTab({
 })
 
 Axis:CreateTab({
-	Name = "Settings",
-	Icon = "settings",
+	Name = "Profile",
+	Icon = "user-round",
 })
 
 Axis:CreateTab({
-	Name = "Profile",
-	Icon = "user-round",
+	Name = "Settings",
+	Icon = "settings",
+	PinnedBottom = true,
 })
 
 return Axis

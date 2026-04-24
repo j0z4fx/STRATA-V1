@@ -19,6 +19,8 @@ return function(Toolkit, Veil)
 	local TabIconInset = 4
 	local TabSpacing = 8
 	local SidebarWidth = 50
+	local DividerInset = 4
+	local BottomSectionGap = 8
 	local Lucide
 
 	local function loadLucide()
@@ -352,11 +354,16 @@ return function(Toolkit, Veil)
 		self.SidebarShell = buildSidebarShell(self.Sidebar)
 
 		self.TabList = Veil.Instance:Create("Frame", {
-			Name = "TabList",
+			Name = "TopTabList",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = UDim2.fromOffset(SidebarInset, SidebarInset),
-			Size = UDim2.new(1, -(SidebarInset * 2), 1, -(SidebarInset * 2)),
+			Size = UDim2.new(
+				1,
+				-(SidebarInset * 2),
+				1,
+				-((SidebarInset * 2) + TabButtonSize + BottomSectionGap + TabSpacing + 1)
+			),
 			ZIndex = 4,
 			Parent = self.Sidebar,
 		})
@@ -367,6 +374,29 @@ return function(Toolkit, Veil)
 			Padding = UDim.new(0, TabSpacing),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Parent = self.TabList,
+		})
+
+		self.SettingsDivider = Veil.Instance:Create("Frame", {
+			Name = "SettingsDivider",
+			AnchorPoint = Vector2.new(0, 1),
+			BackgroundColor3 = COLORS.Stroke,
+			BackgroundTransparency = STROKE_TRANSPARENCY,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, SidebarInset + DividerInset, 1, -(SidebarInset + TabButtonSize + BottomSectionGap)),
+			Size = UDim2.new(1, -((SidebarInset + DividerInset) * 2), 0, 1),
+			ZIndex = 4,
+			Parent = self.Sidebar,
+		})
+
+		self.BottomTabHost = Veil.Instance:Create("Frame", {
+			Name = "BottomTabHost",
+			AnchorPoint = Vector2.new(0, 1),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0, SidebarInset, 1, -SidebarInset),
+			Size = UDim2.new(1, -(SidebarInset * 2), 0, TabButtonSize),
+			ZIndex = 4,
+			Parent = self.Sidebar,
 		})
 
 		self.Content = Veil.Instance:Create("Frame", {
@@ -432,19 +462,27 @@ return function(Toolkit, Veil)
 			Name = options.Name or string.format("Tab %d", #self.Tabs + 1),
 			Icon = options.Icon or "square",
 			Order = #self.Tabs + 1,
+			PinnedBottom = options.PinnedBottom == true or options.Dock == "Bottom",
 		}
+
+		local buttonParent = tab.PinnedBottom and self.BottomTabHost or self.TabList
 
 		tab.Button = Veil.Instance:Create("TextButton", {
 			Name = tab.Name .. "TabButton",
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			LayoutOrder = tab.Order,
+			LayoutOrder = tab.PinnedBottom and 1 or tab.Order,
 			Size = UDim2.fromOffset(TabButtonSize, TabButtonSize),
 			Text = "",
 			ZIndex = 5,
-			Parent = self.TabList,
+			Parent = buttonParent,
 		})
+
+		if tab.PinnedBottom then
+			tab.Button.AnchorPoint = Vector2.new(0.5, 0)
+			tab.Button.Position = UDim2.new(0.5, 0, 0, 0)
+		end
 
 		tab.Highlight = Veil.Instance:Create("Frame", {
 			Name = "Highlight",
