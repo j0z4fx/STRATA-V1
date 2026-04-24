@@ -22,6 +22,7 @@ Axis:CreateTab({
 Axis:CreateTab({
 	Name = "Settings",
 	Icon = "settings",
+	IconScale = 0.8,
 	PinnedBottom = true,
 })
 

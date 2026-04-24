@@ -21,6 +21,7 @@ return function(Toolkit, Veil)
 	local SidebarWidth = 50
 	local DividerInset = 4
 	local BottomSectionGap = 8
+	local DividerOffset = 2
 	local Lucide
 
 	local function loadLucide()
@@ -382,7 +383,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Stroke,
 			BackgroundTransparency = STROKE_TRANSPARENCY,
 			BorderSizePixel = 0,
-			Position = UDim2.new(0, SidebarInset + DividerInset, 1, -(SidebarInset + TabButtonSize + BottomSectionGap)),
+			Position = UDim2.new(0, SidebarInset + DividerInset, 1, -(SidebarInset + TabButtonSize + BottomSectionGap - DividerOffset)),
 			Size = UDim2.new(1, -((SidebarInset + DividerInset) * 2), 0, 1),
 			ZIndex = 4,
 			Parent = self.Sidebar,
@@ -462,8 +463,12 @@ return function(Toolkit, Veil)
 			Name = options.Name or string.format("Tab %d", #self.Tabs + 1),
 			Icon = options.Icon or "square",
 			Order = #self.Tabs + 1,
+			IconScale = type(options.IconScale) == "number" and options.IconScale or 1,
 			PinnedBottom = options.PinnedBottom == true or options.Dock == "Bottom",
 		}
+		local baseIconSize = TabButtonSize - (TabIconInset * 2)
+		local iconSize = math.max(12, math.floor(baseIconSize * tab.IconScale + 0.5))
+		local iconPosition = math.floor((TabButtonSize - iconSize) * 0.5 + 0.5)
 
 		local buttonParent = tab.PinnedBottom and self.BottomTabHost or self.TabList
 
@@ -501,8 +506,8 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Image = "",
 			ImageColor3 = InactiveIconColor,
-			Position = UDim2.fromOffset(TabIconInset, TabIconInset),
-			Size = UDim2.fromOffset(TabButtonSize - (TabIconInset * 2), TabButtonSize - (TabIconInset * 2)),
+			Position = UDim2.fromOffset(iconPosition, iconPosition),
+			Size = UDim2.fromOffset(iconSize, iconSize),
 			ZIndex = 6,
 			Visible = false,
 			Parent = tab.Button,
