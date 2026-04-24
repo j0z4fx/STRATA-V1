@@ -11,6 +11,7 @@ return function(Toolkit, Veil)
 	}
 
 	local TextService = Veil.Services:Get("TextService")
+	local UserInputService = Veil.Services:Get("UserInputService")
 	local AccentTransparency = 0.9
 	local InactiveIconColor = Color3.fromRGB(68, 68, 78)
 	local SidebarInset = 6
@@ -22,6 +23,12 @@ return function(Toolkit, Veil)
 	local DividerInset = 4
 	local BottomSectionGap = 8
 	local DividerOffset = 2
+	local ContentDividerWidth = 2
+	local ContentDividerGrabWidth = 12
+	local ContentDividerPaddingY = 12
+	local ContentDividerHandleWidth = 4
+	local ContentDividerHandleHeight = 28
+	local MinColumnWidth = 150
 	local Lucide
 
 	local function loadLucide()
@@ -208,32 +215,177 @@ return function(Toolkit, Veil)
 		end
 	end
 
-	local function createColumns(parent)
+	local function registerCleanup(self, connection)
+		if connection then
+			table.insert(self.CleanupConnections, connection)
+		end
+
+		return connection
+	end
+
+	local function createContentDivider(parent)
+		local divider = Veil.Instance:Create("Frame", {
+			Name = "ColumnDivider",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(0, ContentDividerGrabWidth, 1, -(ContentDividerPaddingY * 2)),
+			ZIndex = 3,
+			Parent = parent,
+		})
+
+		local line = Veil.Instance:Create("Frame", {
+			Name = "Line",
+			AnchorPoint = Vector2.new(0.5, 0),
+			BackgroundColor3 = COLORS.Stroke,
+			BackgroundTransparency = STROKE_TRANSPARENCY,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0.5, 0, 0, 0),
+			Size = UDim2.new(0, ContentDividerWidth, 1, 0),
+			ZIndex = 3,
+			Parent = divider,
+		})
+
+		local handle = Veil.Instance:Create("Frame", {
+			Name = "Handle",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = COLORS.Stroke,
+			BackgroundTransparency = STROKE_TRANSPARENCY,
+			BorderSizePixel = 0,
+			Position = UDim2.new(0.5, 0, 0.5, 0),
+			Size = UDim2.fromOffset(ContentDividerHandleWidth, ContentDividerHandleHeight),
+			ZIndex = 4,
+			Parent = divider,
+		})
+		createCorner(handle, ContentDividerHandleWidth)
+
+		local hitbox = Veil.Instance:Create("TextButton", {
+			Name = "Hitbox",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.fromScale(1, 1),
+			Text = "",
+			ZIndex = 5,
+			Parent = divider,
+		})
+
+		return divider, hitbox, line, handle
+	end
+
+	local function applyColumnLayout(tab)
+		if not tab.ColumnLayout then
+			return
+		end
+
+		local layout = tab.ColumnLayout
+		local boundaries = layout.Boundaries
+		local columns = layout.Columns
+		local columnCount = #columns
+
+		for index, column in ipairs(columns) do
+			local startScale = index == 1 and 0 or boundaries[index - 1]
+			local endScale = index == columnCount and 1 or boundaries[index]
+			column.Position = UDim2.new(startScale, 0, 0, 0)
+			column.Size = UDim2.new(endScale - startScale, 0, 1, 0)
+		end
+
+		for index, divider in ipairs(layout.Dividers) do
+			divider.Position = UDim2.new(boundaries[index], -(ContentDividerGrabWidth / 2), 0, ContentDividerPaddingY)
+		end
+	end
+
+	local function attachDividerResize(self, tab, dividerIndex)
+		local layout = tab.ColumnLayout
+		local divider = layout.Dividers[dividerIndex]
+		local hitbox = layout.Hitboxes[dividerIndex]
+
+		registerCleanup(self, hitbox.InputBegan:Connect(function(input)
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
+
+			layout.ActiveDivider = dividerIndex
+		end))
+
+		registerCleanup(self, UserInputService.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				layout.ActiveDivider = nil
+			end
+		end))
+
+		registerCleanup(self, UserInputService.InputChanged:Connect(function(input)
+			if layout.ActiveDivider ~= dividerIndex then
+				return
+			end
+
+			if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
+
+			local contentWidth = tab.Content.AbsoluteSize.X
+			if contentWidth <= 0 then
+				return
+			end
+
+			local relativeX = input.Position.X - tab.Content.AbsolutePosition.X
+			local nextScale = relativeX / contentWidth
+			local minimumScale = math.clamp(MinColumnWidth / contentWidth, 0.08, 0.4)
+			local lowerBound = dividerIndex == 1 and minimumScale or (layout.Boundaries[dividerIndex - 1] + minimumScale)
+			local upperBound = dividerIndex == #layout.Boundaries and (1 - minimumScale) or (layout.Boundaries[dividerIndex + 1] - minimumScale)
+			layout.Boundaries[dividerIndex] = math.clamp(nextScale, lowerBound, upperBound)
+			applyColumnLayout(tab)
+		end))
+
+		return divider
+	end
+
+	local function createColumns(self, tab, parent, columnMode)
+		local columns = {}
+
 		local leftColumn = Veil.Instance:Create("Frame", {
 			Name = "leftColumn",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.new(1 / 3, 0, 1, 0),
 			Parent = parent,
 		})
+		table.insert(columns, leftColumn)
 
-		local middleColumn = Veil.Instance:Create("Frame", {
-			Name = "middleColumn",
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Position = UDim2.new(1 / 3, 0, 0, 0),
-			Size = UDim2.new(1 / 3, 0, 1, 0),
-			Parent = parent,
-		})
+		local middleColumn
+		if columnMode == "Triple" then
+			middleColumn = Veil.Instance:Create("Frame", {
+				Name = "middleColumn",
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Parent = parent,
+			})
+			table.insert(columns, middleColumn)
+		end
 
 		local rightColumn = Veil.Instance:Create("Frame", {
 			Name = "rightColumn",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.new(2 / 3, 0, 0, 0),
-			Size = UDim2.new(1 / 3, 0, 1, 0),
 			Parent = parent,
 		})
+		table.insert(columns, rightColumn)
+
+		tab.ColumnLayout = {
+			Mode = columnMode,
+			Columns = columns,
+			Dividers = {},
+			Hitboxes = {},
+			Boundaries = columnMode == "Double" and { 0.5 } or { 1 / 3, 2 / 3 },
+			ActiveDivider = nil,
+		}
+
+		for dividerIndex = 1, #tab.ColumnLayout.Boundaries do
+			local divider, hitbox = createContentDivider(parent)
+			tab.ColumnLayout.Dividers[dividerIndex] = divider
+			tab.ColumnLayout.Hitboxes[dividerIndex] = hitbox
+			attachDividerResize(self, tab, dividerIndex)
+		end
+
+		applyColumnLayout(tab)
 
 		return leftColumn, middleColumn, rightColumn
 	end
@@ -249,6 +401,7 @@ return function(Toolkit, Veil)
 		self.State = Toolkit.State:Scope(self.Id)
 		self.Tabs = {}
 		self.SelectedTab = nil
+		self.CleanupConnections = {}
 
 		self.Frame = Veil.Instance:Create("Frame", {
 			Name = "Window",
@@ -428,6 +581,14 @@ return function(Toolkit, Veil)
 	end
 
 	function Window:Destroy()
+		for _, connection in ipairs(self.CleanupConnections) do
+			if connection and connection.Disconnect then
+				connection:Disconnect()
+			end
+		end
+
+		table.clear(self.CleanupConnections)
+
 		if self.DragBinding then
 			self.DragBinding:Disconnect()
 			self.DragBinding = nil
@@ -466,6 +627,7 @@ return function(Toolkit, Veil)
 			IconScale = type(options.IconScale) == "number" and options.IconScale or 1,
 			PinnedBottom = options.PinnedBottom == true or options.Dock == "Bottom",
 		}
+		tab.IsSettings = options.Settings == true or string.lower(tab.Name) == "settings"
 		local baseIconSize = TabButtonSize - (TabIconInset * 2)
 		local iconSize = math.max(12, math.floor(baseIconSize * tab.IconScale + 0.5))
 		local iconPosition = math.floor((TabButtonSize - iconSize) * 0.5 + 0.5)
@@ -544,7 +706,7 @@ return function(Toolkit, Veil)
 			Parent = self.TabContentHost,
 		})
 
-		tab.leftColumn, tab.middleColumn, tab.rightColumn = createColumns(tab.Content)
+		tab.leftColumn, tab.middleColumn, tab.rightColumn = createColumns(self, tab, tab.Content, tab.IsSettings and "Double" or "Triple")
 
 		tab.Button.MouseButton1Click:Connect(function()
 			self:SelectTab(tab)
