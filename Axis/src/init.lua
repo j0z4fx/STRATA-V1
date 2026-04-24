@@ -180,7 +180,7 @@ return function(Toolkit, Veil)
 
 		local titleWidth = math.ceil(measureText(self.Title, 14, Enum.Font.GothamMedium).X)
 		local chipTextBounds = measureText(self.StatusText, 12, Enum.Font.GothamMedium)
-		local chipWidth = math.ceil(chipTextBounds.X) + 4
+		local chipWidth = math.ceil(chipTextBounds.X) + 8
 
 		self.TitlebarText = Veil.Instance:Create("TextLabel", {
 			Name = "Title",
