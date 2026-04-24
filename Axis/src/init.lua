@@ -13,7 +13,6 @@ return function(Toolkit, Veil)
 	local TextService = Veil.Services:Get("TextService")
 	local RunService = Veil.Services:Get("RunService")
 	local UserInputService = Veil.Services:Get("UserInputService")
-	local GuiService = Veil.Services:Get("GuiService")
 	local AccentTransparency = 0.9
 	local InactiveIconColor = Color3.fromRGB(68, 68, 78)
 	local SidebarInset = 6
@@ -638,12 +637,9 @@ return function(Toolkit, Veil)
 		})
 		self.RenderBinding = RunService.RenderStepped:Connect(function()
 			local mouseLocation = UserInputService:GetMouseLocation()
-			local guiInset = GuiService:GetGuiInset()
-			local cursorX = mouseLocation.X - guiInset.X
-			local cursorY = mouseLocation.Y - guiInset.Y
 
 			if self.Cursor then
-				self.Cursor.Position = UDim2.fromOffset(cursorX, cursorY)
+				self.Cursor.Position = UDim2.fromOffset(mouseLocation.X, mouseLocation.Y)
 				self.Cursor.Visible = self.CursorVisible
 			end
 
