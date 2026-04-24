@@ -599,15 +599,6 @@ return function(Toolkit, Veil)
 			Parent = self.Content,
 		})
 
-		self.CursorLayer = Veil.Instance:Create("Frame", {
-			Name = "CursorLayer",
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
-			ZIndex = 100,
-			Parent = self.Surface,
-		})
-
 		self.Cursor = Veil.Instance:Create("Frame", {
 			Name = "CrossCursor",
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -615,7 +606,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Size = UDim2.fromOffset(17, 17),
 			ZIndex = 101,
-			Parent = self.CursorLayer,
+			Parent = self.Surface,
 		})
 
 		local cursorParts = {
@@ -703,9 +694,8 @@ return function(Toolkit, Veil)
 			self.Frame = nil
 		end
 
-		if self.CursorLayer then
-			Veil.Instance:SecureDestroy(self.CursorLayer)
-			self.CursorLayer = nil
+		if self.Cursor then
+			Veil.Instance:SecureDestroy(self.Cursor)
 			self.Cursor = nil
 		end
 
