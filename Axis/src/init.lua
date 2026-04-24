@@ -1362,7 +1362,6 @@ return function(Toolkit, Veil)
 			ZIndex = 2,
 			Parent = self.Content,
 		})
-		createCorner(self.TabContentHost, 14)
 
 		self.Cursor = Veil.Instance:Create("Frame", {
 			Name = "CrossCursor",
