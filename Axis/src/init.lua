@@ -90,42 +90,96 @@ return function(Toolkit, Veil)
 	local DropdownRowHeight = 30
 	local DropdownItemHeight = 26
 	local DropdownPanelPadding = 4
-	local DropdownPanelWidth = 160
-	local DropdownValueWidth = 68
+	local DropdownPanelWidth = 128
+	local DropdownValueWidth = 128
 	local DropdownCornerRadius = 8
 	local DropdownItemSpacing = 2
 	local DropdownMaxVisibleItems = 7
 	local DropdownPanelGap = 4
 	local DropdownAnimTime = 0.16
 	local DropdownAnimSlide = 6
-	local Lucide
+	local IconProvider = {
+		ActivePack = "Phosphor",
+		Packs = {},
+		Registry = setmetatable({}, { __mode = "k" })
+	}
 
-	local function loadLucide()
-		if Lucide ~= nil then
-			return Lucide
-		end
-
+	function IconProvider:LoadLucide()
+		if self.Packs.Lucide then return self.Packs.Lucide end
 		local success, source = pcall(game.HttpGet, game, "https://raw.githubusercontent.com/notpoiu/lucide-roblox-direct/main/source.lua")
-		if not success or type(source) ~= "string" then
-			Lucide = false
-			return nil
+		if success and type(source) == "string" then
+			local compiled = loadstring(source)
+			if compiled then
+				local ok, module = pcall(compiled)
+				if ok and type(module) == "table" then
+					self.Packs.Lucide = module
+					return module
+				end
+			end
 		end
-
-		local compiled, compileError = loadstring(source)
-		if type(compiled) ~= "function" then
-			warn("[Axis] Failed to compile lucide-roblox-direct", compileError)
-			Lucide = false
-			return nil
-		end
-
-		local ok, module = pcall(compiled)
-		if ok and type(module) == "table" then
-			Lucide = module
-			return Lucide
-		end
-
-		Lucide = false
 		return nil
+	end
+
+	function IconProvider:LoadPhosphor()
+		if self.Packs.Phosphor then return self.Packs.Phosphor end
+		local success, source = pcall(game.HttpGet, game, "https://raw.githubusercontent.com/j0z4fx/phosphor-roblox-direct/master/source.lua")
+		if success and type(source) == "string" then
+			local compiled = loadstring(source)
+			if compiled then
+				local ok, module = pcall(compiled)
+				if ok and type(module) == "table" then
+					self.Packs.Phosphor = module
+					return module
+				end
+			end
+		end
+		return nil
+	end
+
+	function IconProvider:Get(name)
+		local pack = nil
+		if self.ActivePack == "Lucide" then
+			pack = self:LoadLucide()
+		else
+			pack = self:LoadPhosphor()
+		end
+		if pack and type(pack.GetAsset) == "function" then
+			local ok, asset = pcall(pack.GetAsset, name)
+			if ok and type(asset) == "table" then
+				return asset
+			end
+		end
+		return nil
+	end
+
+	function IconProvider:Apply(imageLabel, iconName, tintColor)
+		if not imageLabel then return false end
+		self.Registry[imageLabel] = { IconName = iconName, TintColor = tintColor }
+		
+		local asset = self:Get(iconName)
+		if asset then
+			imageLabel.Image = asset.Url or ""
+			imageLabel.ImageRectSize = asset.ImageRectSize or Vector2.zero
+			imageLabel.ImageRectOffset = asset.ImageRectOffset or Vector2.zero
+			imageLabel.ImageColor3 = tintColor or Color3.new(1, 1, 1)
+			imageLabel.Visible = true
+			return true
+		end
+		
+		imageLabel.Visible = false
+		return false
+	end
+
+	function IconProvider:SetPack(packName)
+		if self.ActivePack == packName then return end
+		self.ActivePack = packName
+		for imageLabel, data in pairs(self.Registry) do
+			if imageLabel.Parent then
+				self:Apply(imageLabel, data.IconName, data.TintColor)
+			else
+				self.Registry[imageLabel] = nil
+			end
+		end
 	end
 
 	local Window = {}
@@ -411,25 +465,7 @@ return function(Toolkit, Veil)
 		return shell
 	end
 
-	local function applyLucideAsset(imageLabel, iconName, tintColor)
-		local lucide = loadLucide()
-		if not lucide or type(lucide.GetAsset) ~= "function" then
-			return false
-		end
-
-		local success, asset = pcall(lucide.GetAsset, iconName)
-		if not success or type(asset) ~= "table" then
-			return false
-		end
-
-		imageLabel.Image = asset.Url or ""
-		imageLabel.ImageRectSize = asset.ImageRectSize or Vector2.zero
-		imageLabel.ImageRectOffset = asset.ImageRectOffset or Vector2.zero
-		imageLabel.ImageColor3 = tintColor
-		imageLabel.Visible = true
-
-		return true
-	end
+-- IconProvider replaces applyLucideAsset
 
 	local function setTabButtonVisual(tab, isSelected, colors)
 		local tint = isSelected and colors.Accent or InactiveIconColor
@@ -1739,7 +1775,7 @@ return function(Toolkit, Veil)
 			Parent = tab.Button,
 		})
 
-		if applyLucideAsset(tab.IconImage, tab.Icon, InactiveIconColor) then
+		if IconProvider:Apply(tab.IconImage, tab.Icon, InactiveIconColor) then
 			tab.IconFallback.Visible = false
 		end
 
@@ -3446,6 +3482,7 @@ return function(Toolkit, Veil)
 			if self.Disabled then return end
 			Axis:_closeActivePicker(self.Panel)
 			Axis.ActivePickerPopup = self.Panel
+			Axis.ActivePickerClose = function() self:Close() end
 			self.Panel.BackgroundTransparency = 1
 			if self.PanelBorder then self.PanelBorder.Transparency = 1 end
 			self.Panel.Position = UDim2.fromOffset(-4000, -4000)
@@ -3478,9 +3515,30 @@ return function(Toolkit, Veil)
 		end
 
 		function dropdown:Close()
-			if self.Panel then
-				self.Panel.Visible = false
+			if self.Panel and self.Panel:GetAttribute("AxisOpen") then
 				self.Panel:SetAttribute("AxisOpen", false)
+				local currentPos = self.Panel.Position
+				local finalPos = UDim2.fromOffset(currentPos.X.Offset, currentPos.Y.Offset - DropdownAnimSlide)
+				
+				local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				local anim = TweenService:Create(self.Panel, tweenInfo, {
+					BackgroundTransparency = 1,
+					Position = finalPos,
+				})
+				
+				if self.PanelBorder then
+					TweenService:Create(self.PanelBorder, tweenInfo, {
+						Transparency = 1,
+					}):Play()
+				end
+				
+				anim:Play()
+				anim.Completed:Connect(function()
+					if not self.Panel:GetAttribute("AxisOpen") then
+						self.Panel.Visible = false
+						self.Panel.Position = UDim2.fromOffset(-4000, -4000)
+					end
+				end)
 			end
 			if Axis.ActivePickerPopup == self.Panel then
 				Axis.ActivePickerPopup = nil
@@ -4262,7 +4320,10 @@ return function(Toolkit, Veil)
 		})
 
 		self.PickerBackdrop.MouseButton1Click:Connect(function()
-			if self.ActivePickerPopup then
+			if self.ActivePickerClose then
+				self.ActivePickerClose()
+				self.ActivePickerClose = nil
+			elseif self.ActivePickerPopup then
 				self.ActivePickerPopup.Visible = false
 				self.ActivePickerPopup:SetAttribute("AxisOpen", false)
 				self.ActivePickerPopup = nil
@@ -4283,9 +4344,15 @@ return function(Toolkit, Veil)
 			return
 		end
 
+		if self.ActivePickerClose then
+			self.ActivePickerClose()
+			self.ActivePickerClose = nil
+		else
+			popup.Visible = false
+			popup:SetAttribute("AxisOpen", false)
+		end
+		
 		self.ActivePickerPopup = nil
-		popup.Visible = false
-		popup:SetAttribute("AxisOpen", false)
 
 		if not self.ActiveModeMenu and self.PickerBackdrop then
 			self.PickerBackdrop.Visible = false
@@ -4443,6 +4510,10 @@ return function(Toolkit, Veil)
 		self._overlayOrder = nil
 		self.ActivePickerPopup = nil
 		self.ActiveModeMenu = nil
+	end
+
+	function Axis:SetIconPack(packName)
+		IconProvider:SetPack(packName)
 	end
 
 	return Axis

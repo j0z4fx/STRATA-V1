@@ -18,11 +18,22 @@ Axis:CreateTab({
 	Icon = "user-round",
 })
 
-Axis:CreateTab({
+local settingsTab = Axis:CreateTab({
 	Name = "Settings",
 	Icon = "settings",
 	IconScale = 0.8,
 	PinnedBottom = true,
+})
+
+local settingsRight = settingsTab.Columns.rightColumn
+
+settingsRight:Dropdown({
+	Name = "Icon Pack",
+	Items = { "Lucide", "Phosphor" },
+	Default = "Phosphor",
+	Callback = function(value)
+		Axis:SetIconPack(value)
+	end,
 })
 
 -- Demo controls on Home tab left column
