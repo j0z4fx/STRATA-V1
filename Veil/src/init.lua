@@ -268,14 +268,13 @@ return function(Toolkit)
 	end
 
 	function GUI:_getHiddenParent()
-		local hiddenGetter = get_hidden_gui or gethui
-		if type(hiddenGetter) ~= "function" then
-			return nil
-		end
-
-		local parent = safeCall(hiddenGetter)
-		if typeof(parent) == "Instance" then
-			return parent
+		for _, hiddenGetter in ipairs({ gethui, get_hidden_gui }) do
+			if type(hiddenGetter) == "function" then
+				local parent = safeCall(hiddenGetter)
+				if typeof(parent) == "Instance" then
+					return parent
+				end
+			end
 		end
 
 		return nil
@@ -461,6 +460,13 @@ return function(Toolkit)
 	local function getGlobalEnvironment()
 		if type(getgenv) == "function" then
 			local success, environment = pcall(getgenv)
+			if success and type(environment) == "table" then
+				return environment
+			end
+		end
+
+		if type(getrenv) == "function" then
+			local success, environment = pcall(getrenv)
 			if success and type(environment) == "table" then
 				return environment
 			end

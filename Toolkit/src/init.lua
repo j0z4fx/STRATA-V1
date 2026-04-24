@@ -735,9 +735,50 @@ local function resolveCustomAssetHandler()
 	return nil
 end
 
+local function resolveRequestHandler()
+	if type(request) == "function" then
+		return request
+	end
+
+	if type(http_request) == "function" then
+		return http_request
+	end
+
+	if type(httprequest) == "function" then
+		return httprequest
+	end
+
+	if type(syn) == "table" and type(syn.request) == "function" then
+		return syn.request
+	end
+
+	if type(syn_request) == "function" then
+		return syn_request
+	end
+
+	return nil
+end
+
 local function getHttpContent(url)
 	if type(url) ~= "string" then
 		return nil
+	end
+
+	local requestHandler = resolveRequestHandler()
+	if type(requestHandler) == "function" then
+		local success, response = pcall(requestHandler, {
+			Url = url,
+			Method = "GET",
+		})
+		if success then
+			if type(response) == "table" and type(response.Body) == "string" then
+				return response.Body
+			end
+
+			if type(response) == "string" then
+				return response
+			end
+		end
 	end
 
 	if type(game.HttpGetAsync) == "function" then
