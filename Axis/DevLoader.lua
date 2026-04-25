@@ -57,6 +57,14 @@ left:Label({
 
 left:SectionHeader("Section Header")
 
+local colorLabel = left:Label({ Name = "Accent Color" })
+colorLabel:AddColorpicker({
+	Default = Color3.fromRGB(242, 168, 190),
+	Callback = function(color)
+		print("Color changed:", color)
+	end,
+})
+
 left:Slider({
 	Name = "Sensitivity",
 	Min = 0,

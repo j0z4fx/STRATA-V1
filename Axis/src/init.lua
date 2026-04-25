@@ -2669,7 +2669,7 @@ return function(Toolkit, Veil)
 			Parent = pickerSurface,
 		})
 		createCorner(colorpicker.Popup, PickerCornerRadius)
-		createBorder(colorpicker.Popup)
+		colorpicker.PopupBorder = createBorder(colorpicker.Popup)
 		createPadding(colorpicker.Popup, PickerPadding, PickerPadding, PickerPadding, PickerPadding)
 
 		colorpicker.PopupPreview = Veil.Instance:Create("Frame", {
@@ -2907,6 +2907,36 @@ return function(Toolkit, Veil)
 
 		local dragTarget = nil
 
+		local function closePopup()
+			if not colorpicker.Popup or not colorpicker.Popup:GetAttribute("AxisOpen") then return end
+			colorpicker.Popup:SetAttribute("AxisOpen", false)
+			local currentPos = colorpicker.Popup.Position
+			local finalPos = UDim2.fromOffset(currentPos.X.Offset, currentPos.Y.Offset - DropdownAnimSlide)
+			local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			TweenService:Create(colorpicker.Popup, tweenInfo, {
+				BackgroundTransparency = 1,
+				Position = finalPos,
+			}):Play()
+			if colorpicker.PopupBorder then
+				TweenService:Create(colorpicker.PopupBorder, tweenInfo, {
+					Transparency = 1,
+				}):Play()
+			end
+			task.delay(DropdownAnimTime, function()
+				if not colorpicker.Popup:GetAttribute("AxisOpen") then
+					colorpicker.Popup.Visible = false
+					colorpicker.Popup.Position = UDim2.fromOffset(-4000, -4000)
+				end
+			end)
+			if Axis.ActivePickerPopup == colorpicker.Popup then
+				Axis.ActivePickerPopup = nil
+				Axis.ActivePickerClose = nil
+				if Axis.PickerBackdrop then
+					Axis.PickerBackdrop.Visible = false
+				end
+			end
+		end
+
 		local function beginPopup()
 			if colorpicker.Disabled or control.Disabled then
 				return
@@ -2915,15 +2945,33 @@ return function(Toolkit, Veil)
 			self:HideTooltip(control)
 			Axis:_closeActivePicker(colorpicker.Popup)
 			Axis.ActivePickerPopup = colorpicker.Popup
+			Axis.ActivePickerClose = function() closePopup() end
+			colorpicker.Popup.BackgroundTransparency = 1
+			if colorpicker.PopupBorder then colorpicker.PopupBorder.Transparency = 1 end
+			colorpicker.Popup.Position = UDim2.fromOffset(-4000, -4000)
 			colorpicker.Popup.Visible = true
 			colorpicker.Popup:SetAttribute("AxisOpen", true)
 			if Axis.PickerBackdrop then
 				Axis.PickerBackdrop.Visible = true
 			end
-			self:_positionPickerPopup(colorpicker.Button, colorpicker.Popup)
-			task.defer(function()
-				if colorpicker.Popup and colorpicker.Popup.Visible then
-					self:_positionPickerPopup(colorpicker.Button, colorpicker.Popup)
+			task.spawn(function()
+				task.wait()
+				if not colorpicker.Popup or not colorpicker.Popup.Visible then return end
+				self:_positionPickerPopup(colorpicker.Button, colorpicker.Popup)
+				local finalPos = colorpicker.Popup.Position
+				colorpicker.Popup.Position = UDim2.fromOffset(
+					finalPos.X.Offset,
+					finalPos.Y.Offset - DropdownAnimSlide
+				)
+				local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				TweenService:Create(colorpicker.Popup, tweenInfo, {
+					BackgroundTransparency = 0,
+					Position = finalPos,
+				}):Play()
+				if colorpicker.PopupBorder then
+					TweenService:Create(colorpicker.PopupBorder, tweenInfo, {
+						Transparency = STROKE_TRANSPARENCY,
+					}):Play()
 				end
 			end)
 		end
@@ -2934,8 +2982,7 @@ return function(Toolkit, Veil)
 			end
 
 			if colorpicker.Popup.Visible then
-				colorpicker.Popup.Visible = false
-				Axis:_closeActivePicker()
+				closePopup()
 				return
 			end
 
@@ -2993,8 +3040,7 @@ return function(Toolkit, Veil)
 				and point.Y >= buttonPos.Y and point.Y <= buttonPos.Y + buttonSize.Y
 
 			if not insidePopup and not insideButton then
-				colorpicker.Popup.Visible = false
-				Axis:_closeActivePicker()
+				closePopup()
 			end
 		end))
 
