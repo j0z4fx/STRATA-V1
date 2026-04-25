@@ -3634,6 +3634,9 @@ return function(Toolkit, Veil)
 		dropdown.PanelBorder = createBorder(dropdown.Panel)
 		createPadding(dropdown.Panel, DropdownPanelPadding, DropdownPanelPadding, DropdownPanelPadding, DropdownPanelPadding)
 
+		-- Forward declaration so the search callback and buildItems share the same upvalue
+		local buildItems
+
 		if dropdown.Searchable then
 			local searchBarFrame = Veil.Instance:Create("Frame", {
 				Name = "SearchBar",
@@ -3698,7 +3701,7 @@ return function(Toolkit, Veil)
 			Parent = dropdown.ItemList,
 		})
 
-		local function buildItems()
+		buildItems = function()
 			for _, child in ipairs(dropdown.ItemList:GetChildren()) do
 				if child:IsA("GuiButton") then
 					child:Destroy()
