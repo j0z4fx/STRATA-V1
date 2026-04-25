@@ -2181,10 +2181,11 @@ return function(Toolkit, Veil)
 		popup.Position = UDim2.fromOffset(nextX, nextY)
 	end
 
-	-- PickerSurface-local placement: below anchor when possible, else above (same strategy as dropdown).
+	-- PickerSurface-local placement: below anchor when possible, else above.
+	-- Returns "below" or "above" so callers can choose the correct slide direction.
 	function Window:_positionPickerPanelBelowAnchor(anchor, panel, panelWidth, panelHeight)
 		if not anchor or not panel then
-			return
+			return "below"
 		end
 		local viewportSize = getViewportSize()
 		local anchorPos = anchor.AbsolutePosition
@@ -2197,19 +2198,24 @@ return function(Toolkit, Veil)
 		local nextX = relX + anchorSize.X - panelWidth
 		nextX = math.clamp(nextX, 10, math.max(10, viewportSize.X - panelWidth - 10))
 		local nextY
+		local direction
 		if belowY + panelHeight <= viewportSize.Y - 10 then
 			nextY = belowY
+			direction = "below"
 		elseif aboveY >= 10 then
 			nextY = aboveY
+			direction = "above"
 		else
 			nextY = math.clamp(belowY, 10, math.max(10, viewportSize.Y - panelHeight - 10))
+			direction = "below"
 		end
 		panel.Size = UDim2.fromOffset(panelWidth, panelHeight)
 		panel.Position = UDim2.fromOffset(nextX, nextY)
+		return direction
 	end
 
 	function Window:_positionDropdownPanel(holder, panel, panelHeight)
-		self:_positionPickerPanelBelowAnchor(holder, panel, DropdownPanelWidth, panelHeight)
+		return self:_positionPickerPanelBelowAnchor(holder, panel, DropdownPanelWidth, panelHeight)
 	end
 
 	function Window:_createKeypicker(control, options)
@@ -3674,11 +3680,14 @@ return function(Toolkit, Veil)
 				task.wait()
 				if not self.Panel or not self.Panel.Visible then return end
 				local h = computePanelHeight()
-				self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
+				local direction = self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
+				self._openDirection = direction
 				local finalPos = self.Panel.Position
+				-- Slide from opposite side: below→slide down from above; above→slide up from below
+				local slideY = direction == "above" and DropdownAnimSlide or -DropdownAnimSlide
 				self.Panel.Position = UDim2.fromOffset(
 					finalPos.X.Offset,
-					finalPos.Y.Offset - DropdownAnimSlide
+					finalPos.Y.Offset + slideY
 				)
 				local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 				TweenService:Create(self.Panel, tweenInfo, {
@@ -3697,7 +3706,9 @@ return function(Toolkit, Veil)
 			if self.Panel and self.Panel:GetAttribute("AxisOpen") then
 				self.Panel:SetAttribute("AxisOpen", false)
 				local currentPos = self.Panel.Position
-				local finalPos = UDim2.fromOffset(currentPos.X.Offset, currentPos.Y.Offset - DropdownAnimSlide)
+				-- Slide out toward origin: below→slide up; above→slide down
+				local slideY = self._openDirection == "above" and DropdownAnimSlide or -DropdownAnimSlide
+				local finalPos = UDim2.fromOffset(currentPos.X.Offset, currentPos.Y.Offset + slideY)
 				
 				local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 				local anim = TweenService:Create(self.Panel, tweenInfo, {
