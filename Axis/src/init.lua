@@ -3677,21 +3677,7 @@ return function(Toolkit, Veil)
 					Parent = dropdown.ItemList,
 				})
 				createCorner(itemButton, 6)
-				createPadding(itemButton, 0, dropdown.MultiSelect and 20 or 8, 0, 8)
-				if dropdown.MultiSelect then
-					local dot = Veil.Instance:Create("Frame", {
-						Name = "CheckDot",
-						AnchorPoint = Vector2.new(1, 0.5),
-						BackgroundColor3 = COLORS.Accent,
-						BackgroundTransparency = isSelected and 0 or 1,
-						BorderSizePixel = 0,
-						Position = UDim2.new(1, -6, 0.5, 0),
-						Size = UDim2.fromOffset(6, 6),
-						ZIndex = 246,
-						Parent = itemButton,
-					})
-					createCorner(dot, 99)
-				end
+				createPadding(itemButton, 0, 8, 0, 8)
 				itemButton.MouseButton1Click:Connect(function()
 					if dropdown.MultiSelect then
 						dropdown:ToggleValue(item)
