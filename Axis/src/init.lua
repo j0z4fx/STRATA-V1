@@ -3478,16 +3478,31 @@ return function(Toolkit, Veil)
 		ensureColumnStack(parentColumn)
 
 		local items = options.Items or options.Options or {}
-		local defaultValue = options.Default or options.Value
-		if defaultValue == nil and #items > 0 then
-			defaultValue = items[1]
+		local isMulti = options.MultiSelect == true
+
+		local defaultValue = nil
+		local defaultValues = {}
+		if isMulti then
+			local dv = options.Default or options.Values or options.Defaults
+			if type(dv) == "table" then
+				for _, v in ipairs(dv) do
+					defaultValues[v] = true
+				end
+			end
+		else
+			defaultValue = options.Default or options.Value
+			if defaultValue == nil and #items > 0 then
+				defaultValue = items[1]
+			end
 		end
 
 		local dropdown = {
 			Type = "Dropdown",
 			Name = options.Name or "Dropdown",
 			Text = options.Name or "Dropdown",
+			MultiSelect = isMulti,
 			Value = defaultValue,
+			Values = defaultValues,
 			Items = items,
 			Disabled = options.Disabled == true,
 			Visible = options.Visible ~= false,
@@ -3496,6 +3511,23 @@ return function(Toolkit, Veil)
 			Tab = tab,
 			Window = self,
 		}
+
+		local function computeBadgeText()
+			if dropdown.MultiSelect then
+				local selected = {}
+				for _, it in ipairs(dropdown.Items) do
+					if dropdown.Values[it] then
+						table.insert(selected, it)
+					end
+				end
+				local n = #selected
+				if n == 0 then return "None"
+				elseif n == 1 then return tostring(selected[1])
+				else return n .. " selected"
+				end
+			end
+			return tostring(dropdown.Value or "")
+		end
 
 		dropdown.Holder = Veil.Instance:Create("Frame", {
 			Name = dropdown.Name,
@@ -3572,7 +3604,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
 			Size = UDim2.fromScale(1, 1),
-			Text = tostring(dropdown.Value or ""),
+			Text = computeBadgeText(),
 			TextColor3 = COLORS.Text,
 			TextSize = 11,
 			TextTransparency = 0.12,
@@ -3624,7 +3656,9 @@ return function(Toolkit, Veil)
 				end
 			end
 			for i, item in ipairs(dropdown.Items) do
-				local isSelected = item == dropdown.Value
+				local isSelected = dropdown.MultiSelect
+					and (dropdown.Values[item] == true)
+					or (item == dropdown.Value)
 				local itemButton = Veil.Instance:Create("TextButton", {
 					Name = tostring(item),
 					AutoButtonColor = false,
@@ -3643,10 +3677,28 @@ return function(Toolkit, Veil)
 					Parent = dropdown.ItemList,
 				})
 				createCorner(itemButton, 6)
-				createPadding(itemButton, 0, 8, 0, 8)
+				createPadding(itemButton, 0, dropdown.MultiSelect and 20 or 8, 0, 8)
+				if dropdown.MultiSelect then
+					local dot = Veil.Instance:Create("Frame", {
+						Name = "CheckDot",
+						AnchorPoint = Vector2.new(1, 0.5),
+						BackgroundColor3 = COLORS.Accent,
+						BackgroundTransparency = isSelected and 0 or 1,
+						BorderSizePixel = 0,
+						Position = UDim2.new(1, -6, 0.5, 0),
+						Size = UDim2.fromOffset(6, 6),
+						ZIndex = 246,
+						Parent = itemButton,
+					})
+					createCorner(dot, 99)
+				end
 				itemButton.MouseButton1Click:Connect(function()
-					dropdown:Set(item)
-					dropdown:Close()
+					if dropdown.MultiSelect then
+						dropdown:ToggleValue(item)
+					else
+						dropdown:Set(item)
+						dropdown:Close()
+					end
 				end)
 			end
 			local totalHeight = #dropdown.Items * DropdownItemHeight
@@ -3741,8 +3793,12 @@ return function(Toolkit, Veil)
 
 		function dropdown:Set(value, opts)
 			opts = opts or {}
+			if self.MultiSelect then
+				self:SetValues(type(value) == "table" and value or {value}, opts)
+				return
+			end
 			self.Value = value
-			self.ValueLabel.Text = tostring(value or "")
+			self.ValueLabel.Text = computeBadgeText()
 			buildItems()
 			if not opts.Silent and self.Callback then
 				pcall(self.Callback, value)
@@ -3752,7 +3808,50 @@ return function(Toolkit, Veil)
 			end
 		end
 
+		function dropdown:SetValues(tbl, opts)
+			opts = opts or {}
+			self.Values = {}
+			if type(tbl) == "table" then
+				for _, v in ipairs(tbl) do
+					self.Values[v] = true
+				end
+			end
+			self.ValueLabel.Text = computeBadgeText()
+			buildItems()
+			if not opts.Silent then
+				local result = self:GetValue()
+				if self.Callback then
+					pcall(self.Callback, result)
+				end
+				self.ChangedSignal:Fire(result)
+			end
+		end
+
+		function dropdown:ToggleValue(item)
+			if self.Values[item] then
+				self.Values[item] = nil
+			else
+				self.Values[item] = true
+			end
+			self.ValueLabel.Text = computeBadgeText()
+			buildItems()
+			local result = self:GetValue()
+			if self.Callback then
+				pcall(self.Callback, result)
+			end
+			self.ChangedSignal:Fire(result)
+		end
+
 		function dropdown:GetValue()
+			if self.MultiSelect then
+				local out = {}
+				for _, it in ipairs(self.Items) do
+					if self.Values[it] then
+						table.insert(out, it)
+					end
+				end
+				return out
+			end
 			return self.Value
 		end
 
@@ -3762,6 +3861,8 @@ return function(Toolkit, Veil)
 
 		function dropdown:SetItems(newItems)
 			self.Items = newItems or {}
+			self.Values = {}
+			self.ValueLabel.Text = computeBadgeText()
 			buildItems()
 		end
 
