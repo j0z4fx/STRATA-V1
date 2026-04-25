@@ -86,6 +86,9 @@ return function(Toolkit, Veil)
 	local SliderValueWidth = 38
 	local SliderLerpAlpha = 0.22
 	local SliderDragLerpAlpha = 0.42
+	local SliderThumbHoverDiameter = 16
+	local SliderThumbDragDiameter = 17
+	local SliderThumbAnimTime = 0.10
 	local DropdownRowHeight = 30
 	local DropdownItemHeight = 26
 	local DropdownPanelPadding = 4
@@ -3354,6 +3357,18 @@ return function(Toolkit, Veil)
 
 	-- ── Slider shared internals ──────────────────────────────────────────────
 
+	local function makeThumbAnimator(thumb)
+		local thumbTI = TweenInfo.new(SliderThumbAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		return function(state)
+			local d = state == "drag" and SliderThumbDragDiameter
+				or state == "hover" and SliderThumbHoverDiameter
+				or SliderThumbDiameter
+			TweenService:Create(thumb, thumbTI, {
+				Size = UDim2.fromOffset(d, d),
+			}):Play()
+		end
+	end
+
 	local function buildSliderTrack(holder, trackZoneTop, thumbRadius, trackInsetY)
 		local trackZone = Veil.Instance:Create("Frame", {
 			Name = "TrackZone",
@@ -4000,6 +4015,8 @@ return function(Toolkit, Veil)
 		slider.TrackZone, slider.TrackBg, slider.TrackFill, slider.Thumb, slider.Hitbox =
 			buildSliderTrack(slider.Holder, trackZoneTop, thumbRadius, trackInsetY)
 
+		local setThumbState = makeThumbAnimator(slider.Thumb)
+
 		function slider:_refreshTrack()
 			local f = self.VisualFraction
 			local trackW = self.TrackBg.AbsoluteSize.X
@@ -4011,7 +4028,7 @@ return function(Toolkit, Veil)
 			if self.SubtextLabel then
 				self.SubtextLabel.TextTransparency = disabled and 0.6 or 0.35
 			end
-			self.ValueLabel.TextTransparency = disabled and 0.6 or 0.25
+			self.ValueLabel.TextTransparency = disabled and 0.6 or (self.IsDragging and 0.05 or 0.25)
 			local blockT = disabled and 0.45 or 0
 			self.TrackFill.BackgroundTransparency = blockT
 			self.Thumb.BackgroundTransparency = blockT
@@ -4072,6 +4089,21 @@ return function(Toolkit, Veil)
 
 		local dragging = false
 
+		slider.Hitbox.MouseEnter:Connect(function()
+			if slider.Disabled then return end
+			slider.IsHovered = true
+			if not slider.IsDragging then
+				setThumbState("hover")
+			end
+		end)
+
+		slider.Hitbox.MouseLeave:Connect(function()
+			slider.IsHovered = false
+			if not slider.IsDragging then
+				setThumbState("normal")
+			end
+		end)
+
 		slider.Hitbox.InputBegan:Connect(function(input)
 			if slider.Disabled then return end
 			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
@@ -4079,6 +4111,7 @@ return function(Toolkit, Veil)
 			end
 			dragging = true
 			slider.IsDragging = true
+			setThumbState("drag")
 			slider:_updateFromInput(input.Position)
 		end)
 
@@ -4094,10 +4127,11 @@ return function(Toolkit, Veil)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				dragging = false
 				slider.IsDragging = false
+				setThumbState(slider.IsHovered and "hover" or "normal")
 			end
 		end))
 
-		registerCleanup(self, RunService.Heartbeat:Connect(function()
+		registerCleanup(self, RunService.Heartbeat:Connect(function(dt)
 			if math.abs(slider.TargetFraction - slider.VisualFraction) < 0.0005 then
 				if slider.VisualFraction ~= slider.TargetFraction then
 					slider.VisualFraction = slider.TargetFraction
@@ -4105,7 +4139,8 @@ return function(Toolkit, Veil)
 				end
 				return
 			end
-			local alpha = slider.IsDragging and SliderDragLerpAlpha or SliderLerpAlpha
+			local baseAlpha = slider.IsDragging and SliderDragLerpAlpha or SliderLerpAlpha
+			local alpha = 1 - (1 - baseAlpha) ^ (dt * 60)
 			slider.VisualFraction = slider.VisualFraction + (slider.TargetFraction - slider.VisualFraction) * alpha
 			slider:_refreshTrack()
 		end))
@@ -4165,6 +4200,8 @@ return function(Toolkit, Veil)
 		slider.TrackZone, slider.TrackBg, slider.TrackFill, slider.Thumb, slider.Hitbox =
 			buildSliderTrack(slider.Holder, trackZoneTop, thumbRadius, trackInsetY)
 
+		local setThumbState = makeThumbAnimator(slider.Thumb)
+
 		-- Build notch marks below the track zone
 		local notchCount = math.floor((max - min) / step + 0.5) + 1
 		local notchZone = Veil.Instance:Create("Frame", {
@@ -4204,7 +4241,7 @@ return function(Toolkit, Veil)
 			if self.SubtextLabel then
 				self.SubtextLabel.TextTransparency = disabled and 0.6 or 0.35
 			end
-			self.ValueLabel.TextTransparency = disabled and 0.6 or 0.25
+			self.ValueLabel.TextTransparency = disabled and 0.6 or (self.IsDragging and 0.05 or 0.25)
 			local blockT = disabled and 0.45 or 0
 			self.TrackFill.BackgroundTransparency = blockT
 			self.Thumb.BackgroundTransparency = blockT
@@ -4263,11 +4300,27 @@ return function(Toolkit, Veil)
 
 		local dragging = false
 
+		slider.Hitbox.MouseEnter:Connect(function()
+			if slider.Disabled then return end
+			slider.IsHovered = true
+			if not slider.IsDragging then
+				setThumbState("hover")
+			end
+		end)
+
+		slider.Hitbox.MouseLeave:Connect(function()
+			slider.IsHovered = false
+			if not slider.IsDragging then
+				setThumbState("normal")
+			end
+		end)
+
 		slider.Hitbox.InputBegan:Connect(function(input)
 			if slider.Disabled then return end
 			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
 			dragging = true
 			slider.IsDragging = true
+			setThumbState("drag")
 			slider:_updateFromInput(input.Position)
 		end)
 
@@ -4281,10 +4334,11 @@ return function(Toolkit, Veil)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				dragging = false
 				slider.IsDragging = false
+				setThumbState(slider.IsHovered and "hover" or "normal")
 			end
 		end))
 
-		registerCleanup(self, RunService.Heartbeat:Connect(function()
+		registerCleanup(self, RunService.Heartbeat:Connect(function(dt)
 			if math.abs(slider.TargetFraction - slider.VisualFraction) < 0.0005 then
 				if slider.VisualFraction ~= slider.TargetFraction then
 					slider.VisualFraction = slider.TargetFraction
@@ -4292,7 +4346,8 @@ return function(Toolkit, Veil)
 				end
 				return
 			end
-			local alpha = slider.IsDragging and SliderDragLerpAlpha or SliderLerpAlpha
+			local baseAlpha = slider.IsDragging and SliderDragLerpAlpha or SliderLerpAlpha
+			local alpha = 1 - (1 - baseAlpha) ^ (dt * 60)
 			slider.VisualFraction = slider.VisualFraction + (slider.TargetFraction - slider.VisualFraction) * alpha
 			slider:_refreshTrack()
 		end))
@@ -4608,9 +4663,10 @@ return function(Toolkit, Veil)
 			end
 		end))
 
-		registerCleanup(self, RunService.Heartbeat:Connect(function()
+		registerCleanup(self, RunService.Heartbeat:Connect(function(dt)
 			local isDragging = slider.ActiveThumb ~= nil
-			local alpha = isDragging and SliderDragLerpAlpha or SliderLerpAlpha
+			local baseAlpha = isDragging and SliderDragLerpAlpha or SliderLerpAlpha
+			local alpha = 1 - (1 - baseAlpha) ^ (dt * 60)
 			local dirtyLo = math.abs(slider.LowTarget - slider.LowVisual) >= 0.0005
 			local dirtyHi = math.abs(slider.HighTarget - slider.HighVisual) >= 0.0005
 
