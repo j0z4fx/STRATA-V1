@@ -107,8 +107,9 @@ right:Dropdown({
 
 right:Dropdown({
 	Name = "Target Player",
-	Items = { "Player1", "Player2", "Player3", "Player4", "Player5", "Player6", "Player7", "Player8tawtwatwatawtwaatwat" },
+	Items = { "Player1", "Player2", "Player3", "Player4", "Player5", "Player6", "Player7", "Player8" },
 	Default = "Player1",
+	Searchable = true,
 })
 
 local middle = homeTab.Columns.middleColumn

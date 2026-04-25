@@ -97,6 +97,8 @@ return function(Toolkit, Veil)
 	local DropdownPanelGap = 4
 	local DropdownAnimTime = 0.16
 	local DropdownAnimSlide = 6
+	local DropdownSearchBarHeight = 22
+	local DropdownSearchBarGap = 4
 	local COLORS = {
 		Window = Color3.fromRGB(19, 19, 22),
 		Titlebar = Color3.fromRGB(24, 24, 27),
@@ -3501,6 +3503,8 @@ return function(Toolkit, Veil)
 			Name = options.Name or "Dropdown",
 			Text = options.Name or "Dropdown",
 			MultiSelect = isMulti,
+			Searchable = options.Searchable == true,
+			_searchQuery = "",
 			Value = defaultValue,
 			Values = defaultValues,
 			Items = items,
@@ -3630,14 +3634,59 @@ return function(Toolkit, Veil)
 		dropdown.PanelBorder = createBorder(dropdown.Panel)
 		createPadding(dropdown.Panel, DropdownPanelPadding, DropdownPanelPadding, DropdownPanelPadding, DropdownPanelPadding)
 
+		if dropdown.Searchable then
+			local searchBarFrame = Veil.Instance:Create("Frame", {
+				Name = "SearchBar",
+				BackgroundColor3 = COLORS.ToggleOffBackground,
+				BorderSizePixel = 0,
+				Size = UDim2.new(1, 0, 0, DropdownSearchBarHeight),
+				ZIndex = 245,
+				Parent = dropdown.Panel,
+			})
+			createCorner(searchBarFrame, 6)
+			Veil.Instance:Create("UIStroke", {
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+				Color = COLORS.Stroke,
+				Transparency = STROKE_TRANSPARENCY,
+				Thickness = 1,
+				Parent = searchBarFrame,
+			})
+			dropdown.SearchBox = Veil.Instance:Create("TextBox", {
+				Name = "SearchInput",
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				ClearTextOnFocus = false,
+				Font = Enum.Font.GothamMedium,
+				PlaceholderColor3 = COLORS.Text,
+				PlaceholderText = "Search...",
+				Size = UDim2.fromScale(1, 1),
+				Text = "",
+				TextColor3 = COLORS.Text,
+				TextSize = 11,
+				TextTransparency = 0.12,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				ZIndex = 246,
+				Parent = searchBarFrame,
+			})
+			dropdown.SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+				dropdown._searchQuery = dropdown.SearchBox.Text
+				buildItems()
+			end)
+		end
+
+		local itemListOffsetY = dropdown.Searchable
+			and (DropdownSearchBarHeight + DropdownSearchBarGap)
+			or 0
+
 		dropdown.ItemList = Veil.Instance:Create("ScrollingFrame", {
 			Name = "ItemList",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			CanvasSize = UDim2.new(0, 0, 0, 0),
+			Position = UDim2.fromOffset(0, itemListOffsetY),
 			ScrollBarThickness = 0,
 			ScrollingDirection = Enum.ScrollingDirection.Y,
-			Size = UDim2.fromScale(1, 1),
+			Size = UDim2.new(1, 0, 1, -itemListOffsetY),
 			ZIndex = 245,
 			Parent = dropdown.Panel,
 		})
@@ -3655,7 +3704,18 @@ return function(Toolkit, Veil)
 					child:Destroy()
 				end
 			end
-			for i, item in ipairs(dropdown.Items) do
+			local visibleItems = dropdown.Items
+			if dropdown.Searchable and dropdown._searchQuery ~= "" then
+				local q = string.lower(dropdown._searchQuery)
+				local filtered = {}
+				for _, item in ipairs(dropdown.Items) do
+					if string.find(string.lower(tostring(item)), q, 1, true) then
+						table.insert(filtered, item)
+					end
+				end
+				visibleItems = filtered
+			end
+			for i, item in ipairs(visibleItems) do
 				local isSelected = dropdown.MultiSelect
 					and (dropdown.Values[item] == true)
 					or (item == dropdown.Value)
@@ -3687,18 +3747,22 @@ return function(Toolkit, Veil)
 					end
 				end)
 			end
-			local totalHeight = #dropdown.Items * DropdownItemHeight
-				+ math.max(0, #dropdown.Items - 1) * DropdownItemSpacing
+			local totalHeight = #visibleItems * DropdownItemHeight
+				+ math.max(0, #visibleItems - 1) * DropdownItemSpacing
 			dropdown.ItemList.CanvasSize = UDim2.fromOffset(0, totalHeight)
 		end
 
 		buildItems()
 
 		local function computePanelHeight()
-			local visibleItems = math.min(#dropdown.Items, DropdownMaxVisibleItems)
-			return visibleItems * DropdownItemHeight
-				+ math.max(0, visibleItems - 1) * DropdownItemSpacing
+			local count = math.min(#dropdown.Items, DropdownMaxVisibleItems)
+			local h = count * DropdownItemHeight
+				+ math.max(0, count - 1) * DropdownItemSpacing
 				+ DropdownPanelPadding * 2
+			if dropdown.Searchable then
+				h = h + DropdownSearchBarHeight + DropdownSearchBarGap
+			end
+			return h
 		end
 
 		function dropdown:Open()
@@ -3741,6 +3805,11 @@ return function(Toolkit, Veil)
 		end
 
 		function dropdown:Close()
+			if self.Searchable and self.SearchBox then
+				self._searchQuery = ""
+				self.SearchBox.Text = ""
+				buildItems()
+			end
 			if self.Panel and self.Panel:GetAttribute("AxisOpen") then
 				self.Panel:SetAttribute("AxisOpen", false)
 				local currentPos = self.Panel.Position
