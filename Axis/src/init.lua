@@ -32,8 +32,11 @@ return function(Toolkit, Veil)
 	local ContentDividerHandleHeight = 28
 	local MinColumnWidth = 150
 	local ResizeSmoothness = 0.08
-	local OverlaySpacing = 10
-	local OverlayAnimationTime = 0.28
+	local OverlaySpacing = 12
+	local OverlayAnimationTime = 0.22
+	local OverlayExitTime = 0.16
+	local OverlayCollapseTime = 0.20
+	local OverlayMaxStack = 3
 	local OverlayCornerRadius = 12
 	local OverlayAccentLineWidth = 3
 	local ToastWidth = 320
@@ -1136,53 +1139,49 @@ return function(Toolkit, Veil)
 	end
 
 	local function animateOverlayCard(card, targetOffset, isVisible, onComplete)
-		local tween = TweenService:Create(card, TweenInfo.new(OverlayAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		local dur = isVisible and OverlayAnimationTime or OverlayExitTime
+		local style = isVisible and Enum.EasingStyle.Quint or Enum.EasingStyle.Quad
+		local ti = TweenInfo.new(dur, style, Enum.EasingDirection.Out)
+
+		local tween = TweenService:Create(card, ti, {
 			Position = UDim2.fromOffset(targetOffset.X, targetOffset.Y),
 		})
-		local tweens = {
-			tween,
-		}
+		local tweens = { tween }
 
-		local cardTween = TweenService:Create(card, TweenInfo.new(OverlayAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		table.insert(tweens, TweenService:Create(card, ti, {
 			BackgroundTransparency = isVisible and 0 or 1,
-		})
-		table.insert(tweens, cardTween)
+		}))
 
 		for _, descendant in ipairs(card:GetDescendants()) do
 			if descendant:IsA("UIStroke") then
-				table.insert(tweens, TweenService:Create(descendant, TweenInfo.new(OverlayAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				table.insert(tweens, TweenService:Create(descendant, ti, {
 					Transparency = isVisible and STROKE_TRANSPARENCY or 1,
 				}))
 			elseif descendant:IsA("TextLabel") then
-				local baseTextTransparency = descendant:GetAttribute("AxisBaseTextTransparency")
-				if baseTextTransparency == nil then
-					baseTextTransparency = descendant.TextTransparency
-					descendant:SetAttribute("AxisBaseTextTransparency", baseTextTransparency)
+				local baseT = descendant:GetAttribute("AxisBaseTextTransparency")
+				if baseT == nil then
+					baseT = descendant.TextTransparency
+					descendant:SetAttribute("AxisBaseTextTransparency", baseT)
 				end
-				table.insert(tweens, TweenService:Create(descendant, TweenInfo.new(OverlayAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-					TextTransparency = isVisible and baseTextTransparency or 1,
+				table.insert(tweens, TweenService:Create(descendant, ti, {
+					TextTransparency = isVisible and baseT or 1,
 				}))
 			elseif descendant:IsA("Frame") and descendant.Name == "AccentEdge" then
-				table.insert(tweens, TweenService:Create(descendant, TweenInfo.new(OverlayAnimationTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				table.insert(tweens, TweenService:Create(descendant, ti, {
 					BackgroundTransparency = isVisible and 0 or 1,
 				}))
 			end
 		end
 
 		if onComplete then
-			local connection
-			connection = tween.Completed:Connect(function()
-				if connection then
-					connection:Disconnect()
-				end
+			local conn
+			conn = tween.Completed:Connect(function()
+				if conn then conn:Disconnect() end
 				onComplete()
 			end)
 		end
 
-		for _, activeTween in ipairs(tweens) do
-			activeTween:Play()
-		end
-
+		for _, t in ipairs(tweens) do t:Play() end
 		return tween
 	end
 
@@ -5143,11 +5142,26 @@ return function(Toolkit, Veil)
 
 		entry.Destroyed = true
 		animateOverlayCard(entry.Card, entry.ExitOffset, false, function()
-			if entry.Wrapper then
-				Veil.Instance:SecureDestroy(entry.Wrapper)
-				entry.Wrapper = nil
-				entry.Card = nil
-			end
+			local wrapper = entry.Wrapper
+			if not wrapper then return end
+
+			-- Freeze AutomaticSize so we can tween height to 0
+			local currentHeight = wrapper.AbsoluteSize.Y
+			wrapper.AutomaticSize = Enum.AutomaticSize.None
+			wrapper.Size = UDim2.fromOffset(wrapper.AbsoluteSize.X, currentHeight)
+
+			local collapseTI = TweenInfo.new(OverlayCollapseTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			local tween = TweenService:Create(wrapper, collapseTI, {
+				Size = UDim2.fromOffset(wrapper.AbsoluteSize.X, 0),
+			})
+			tween:Play()
+			tween.Completed:Connect(function()
+				if entry.Wrapper then
+					Veil.Instance:SecureDestroy(entry.Wrapper)
+					entry.Wrapper = nil
+					entry.Card = nil
+				end
+			end)
 		end)
 	end
 
@@ -5161,6 +5175,22 @@ return function(Toolkit, Veil)
 		local config = locations[locationKey]
 		local host = kind == "Toast" and self.ToastHosts[locationKey] or self.NotificationHosts[locationKey]
 		local accentColor = options.AccentColor or COLORS.Accent
+
+		-- Enforce max stack: dismiss oldest in this location if at cap
+		local stackCount = 0
+		local oldest = nil
+		for _, e in pairs(self.ActiveOverlays) do
+			if e.Wrapper and e.Wrapper.Parent == host and not e.Destroyed then
+				stackCount = stackCount + 1
+				if oldest == nil or e.Id < oldest.Id then
+					oldest = e
+				end
+			end
+		end
+		if stackCount >= OverlayMaxStack and oldest then
+			self.ActiveOverlays[oldest.Id] = nil
+			self:_destroyOverlayEntry(oldest)
+		end
 
 		self._overlayOrder = self._overlayOrder + 1
 
