@@ -109,6 +109,9 @@ return function(Toolkit, Veil)
 	local InputFieldWidth = 110
 	local InputFocusStrokeTransparency = 0.72
 	local InputAnimTime = 0.12
+	local ButtonRowHeight = 30
+	local ButtonCornerRadius = 8
+	local ButtonAnimTime = 0.10
 	local COLORS = {
 		Window = Color3.fromRGB(19, 19, 22),
 		Titlebar = Color3.fromRGB(24, 24, 27),
@@ -1950,6 +1953,11 @@ return function(Toolkit, Veil)
 					elementOptions.ColumnFrame = columnApi.Frame
 					return columnApi.Window:_createInput(columnApi.Tab, elementOptions)
 				end,
+				Button = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createButton(columnApi.Tab, elementOptions)
+				end,
 			}
 		end
 
@@ -1989,6 +1997,9 @@ return function(Toolkit, Veil)
 		end
 		function tab:Input(elementOptions)
 			return self.Window:_createInput(self, elementOptions)
+		end
+		function tab:Button(elementOptions)
+			return self.Window:_createButton(self, elementOptions)
 		end
 
 		tab.Button.MouseButton1Click:Connect(function()
@@ -4188,6 +4199,124 @@ return function(Toolkit, Veil)
 
 		input:SetDisabled(input.Disabled)
 		return input
+	end
+
+	-- ── Button ───────────────────────────────────────────────────────────────
+
+	function Window:_createButton(tab, options)
+		options = options or {}
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local isPrimary = (options.Style or options.style or "primary") ~= "secondary"
+
+		local btn = {
+			Type = "Button",
+			Name = options.Name or options.Text or "Button",
+			Style = isPrimary and "primary" or "secondary",
+			Disabled = options.Disabled == true,
+			Visible = options.Visible ~= false,
+			Callback = options.Callback,
+			Tab = tab,
+			Window = self,
+		}
+
+		btn.Holder = Veil.Instance:Create("Frame", {
+			Name = btn.Name,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			LayoutOrder = type(options.Order) == "number" and options.Order or 999,
+			Size = UDim2.new(1, 0, 0, ButtonRowHeight),
+			Visible = btn.Visible,
+			Parent = parentColumn,
+		})
+
+		local bgColor = isPrimary and COLORS.Accent or COLORS.ToggleOffBackground
+		local bgTransp = isPrimary and 0 or 1
+		local textColor = isPrimary and COLORS.Window or COLORS.Text
+		local textTransp = isPrimary and 0.05 or 0.12
+
+		btn.Inner = Veil.Instance:Create("TextButton", {
+			Name = "Inner",
+			AutoButtonColor = false,
+			BackgroundColor3 = bgColor,
+			BackgroundTransparency = bgTransp,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamBold,
+			Size = UDim2.fromScale(1, 1),
+			Text = btn.Name,
+			TextColor3 = textColor,
+			TextSize = 13,
+			TextTransparency = textTransp,
+			ZIndex = 5,
+			Parent = btn.Holder,
+		})
+		createCorner(btn.Inner, ButtonCornerRadius)
+
+		-- Secondary gets accent stroke; primary gets subtle stroke for definition
+		btn.Stroke = Veil.Instance:Create("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = isPrimary and COLORS.Accent or COLORS.Stroke,
+			Transparency = isPrimary and 0.85 or STROKE_TRANSPARENCY,
+			Thickness = 1,
+			Parent = btn.Inner,
+		})
+
+		local animTI = TweenInfo.new(ButtonAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+		local hoverBgTransp = isPrimary and 0.12 or 0.72
+		local pressBgTransp = isPrimary and 0.22 or 0.55
+
+		btn.Inner.MouseEnter:Connect(function()
+			if btn.Disabled then return end
+			TweenService:Create(btn.Inner, animTI, {
+				BackgroundTransparency = hoverBgTransp,
+			}):Play()
+		end)
+
+		btn.Inner.MouseLeave:Connect(function()
+			TweenService:Create(btn.Inner, animTI, {
+				BackgroundTransparency = bgTransp,
+			}):Play()
+		end)
+
+		btn.Inner.InputBegan:Connect(function(input)
+			if btn.Disabled then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+			TweenService:Create(btn.Inner, animTI, {
+				BackgroundTransparency = pressBgTransp,
+			}):Play()
+		end)
+
+		btn.Inner.InputEnded:Connect(function(input)
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+			TweenService:Create(btn.Inner, animTI, {
+				BackgroundTransparency = hoverBgTransp,
+			}):Play()
+		end)
+
+		btn.Inner.MouseButton1Click:Connect(function()
+			if btn.Disabled then return end
+			if btn.Callback then
+				pcall(btn.Callback)
+			end
+		end)
+
+		function btn:SetDisabled(disabled)
+			self.Disabled = disabled == true
+			self.Inner.Active = not self.Disabled
+			self.Inner.TextTransparency = self.Disabled and 0.45 or textTransp
+			self.Inner.BackgroundTransparency = self.Disabled and (isPrimary and 0.35 or 1) or bgTransp
+		end
+
+		function btn:SetVisible(visible)
+			self.Visible = visible ~= false
+			self.Holder.Visible = self.Visible
+		end
+
+		btn:SetDisabled(btn.Disabled)
+		return btn
 	end
 
 	-- ── Normal Slider ────────────────────────────────────────────────────────

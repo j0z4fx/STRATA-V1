@@ -82,6 +82,23 @@ left:Slider({
 	Subtext = "Camera smoothing amount",
 })
 
+left:SectionHeader("Actions")
+
+left:Button({
+	Name = "Connect",
+	Callback = function()
+		print("Primary button clicked")
+	end,
+})
+
+left:Button({
+	Name = "Disconnect",
+	Style = "secondary",
+	Callback = function()
+		print("Secondary button clicked")
+	end,
+})
+
 local right = homeTab.Columns.rightColumn
 
 right:SectionHeader("Input")
