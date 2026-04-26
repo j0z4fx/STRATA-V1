@@ -59,6 +59,9 @@ return function(Toolkit, Veil)
 	local ToggleSwitchHeight = 20
 	local ToggleDotSize = 12
 	local ToggleAnimationTime = 0.22
+	local ToggleHoverStrokeTransparency = 0.82
+	local TogglePressAnimTime = 0.08
+	local ToggleDotPressSize = 10
 	local ToggleTooltipDelay = 0.8
 	local TooltipOffset = Vector2.new(16, -10)
 	local TooltipMaxWidth = 260
@@ -3241,7 +3244,7 @@ return function(Toolkit, Veil)
 				BackgroundColor3 = targetBackground,
 				BackgroundTransparency = switchTransparency,
 			}):Play()
-			TweenService:Create(self.SwitchDot, TweenInfo.new(ToggleAnimationTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+			TweenService:Create(self.SwitchDot, TweenInfo.new(ToggleAnimationTime, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
 				BackgroundColor3 = targetDotColor,
 				BackgroundTransparency = dotTransparency,
 				Position = targetDotPosition,
@@ -3335,9 +3338,42 @@ return function(Toolkit, Veil)
 			toggle:Toggle()
 		end)
 
+		-- Hover: brighten switch stroke
+		local hoverTI = TweenInfo.new(TogglePressAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		toggle.Button.MouseEnter:Connect(function()
+			toggle.Hovering = true
+			if toggle.Disabled then return end
+			TweenService:Create(toggle.SwitchStroke, hoverTI, {
+				Transparency = ToggleHoverStrokeTransparency,
+			}):Play()
+		end)
+		toggle.Button.MouseLeave:Connect(function()
+			toggle.Hovering = false
+			self:HideTooltip(toggle)
+			TweenService:Create(toggle.SwitchStroke, hoverTI, {
+				Transparency = STROKE_TRANSPARENCY,
+			}):Play()
+		end)
+
+		-- Press: dot shrinks on down, restores on up
+		local pressTI = TweenInfo.new(TogglePressAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		toggle.Button.InputBegan:Connect(function(input)
+			if toggle.Disabled then return end
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+			TweenService:Create(toggle.SwitchDot, pressTI, {
+				Size = UDim2.fromOffset(ToggleDotPressSize, ToggleDotPressSize),
+			}):Play()
+		end)
+		toggle.Button.InputEnded:Connect(function(input)
+			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+			TweenService:Create(toggle.SwitchDot, pressTI, {
+				Size = UDim2.fromOffset(ToggleDotSize, ToggleDotSize),
+			}):Play()
+		end)
+
+		-- Tooltip (only when no subtext and tooltip string provided)
 		if not hasSubtext and type(toggle.Tooltip) == "string" and toggle.Tooltip ~= "" then
 			toggle.Button.MouseEnter:Connect(function()
-				toggle.Hovering = true
 				self.TooltipToken = self.TooltipToken + 1
 				local token = self.TooltipToken
 				task.delay(ToggleTooltipDelay, function()
@@ -3349,11 +3385,6 @@ return function(Toolkit, Veil)
 					end
 					self:ShowTooltip(toggle, toggle.Tooltip)
 				end)
-			end)
-
-			toggle.Button.MouseLeave:Connect(function()
-				toggle.Hovering = false
-				self:HideTooltip(toggle)
 			end)
 		end
 
