@@ -102,6 +102,10 @@ return function(Toolkit, Veil)
 	local DropdownAnimSlide = 6
 	local DropdownSearchBarHeight = 22
 	local DropdownSearchBarGap = 4
+	local InputRowHeight = 30
+	local InputFieldWidth = 110
+	local InputFocusStrokeTransparency = 0.72
+	local InputAnimTime = 0.12
 	local COLORS = {
 		Window = Color3.fromRGB(19, 19, 22),
 		Titlebar = Color3.fromRGB(24, 24, 27),
@@ -1938,6 +1942,11 @@ return function(Toolkit, Veil)
 					elementOptions.ColumnFrame = columnApi.Frame
 					return columnApi.Window:_createDropdown(columnApi.Tab, elementOptions)
 				end,
+				Input = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createInput(columnApi.Tab, elementOptions)
+				end,
 			}
 		end
 
@@ -1974,6 +1983,9 @@ return function(Toolkit, Veil)
 		end
 		function tab:Dropdown(elementOptions)
 			return self.Window:_createDropdown(self, elementOptions)
+		end
+		function tab:Input(elementOptions)
+			return self.Window:_createInput(self, elementOptions)
 		end
 
 		tab.Button.MouseButton1Click:Connect(function()
@@ -3967,6 +3979,184 @@ return function(Toolkit, Veil)
 		end))
 
 		return dropdown
+	end
+
+	-- ── Input Field ──────────────────────────────────────────────────────────
+
+	function Window:_createInput(tab, options)
+		options = options or {}
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local input = {
+			Type = "Input",
+			Name = options.Name or "Input",
+			Value = tostring(options.Default or options.Value or ""),
+			Placeholder = options.Placeholder or "",
+			MaxLength = tonumber(options.MaxLength),
+			Validator = type(options.Validator) == "function" and options.Validator or nil,
+			Disabled = options.Disabled == true,
+			Visible = options.Visible ~= false,
+			Callback = options.Callback,
+			ChangedSignal = Toolkit.Signal.new(),
+			Tab = tab,
+			Window = self,
+		}
+
+		input.Holder = Veil.Instance:Create("Frame", {
+			Name = input.Name,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			LayoutOrder = type(options.Order) == "number" and options.Order or 999,
+			Size = UDim2.new(1, 0, 0, InputRowHeight),
+			Visible = input.Visible,
+			Parent = parentColumn,
+		})
+
+		local rightReserved = InputFieldWidth + 8
+
+		input.LabelWrap = Veil.Instance:Create("Frame", {
+			Name = "LabelWrap",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, -rightReserved, 1, 0),
+			ZIndex = 5,
+			Parent = input.Holder,
+		})
+
+		input.TitleLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Title",
+			AnchorPoint = Vector2.new(0, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.new(0, 0, 0.5, 0),
+			Size = UDim2.new(1, 0, 0, 18),
+			Text = input.Name,
+			TextColor3 = COLORS.Text,
+			TextSize = 14,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 5,
+			Parent = input.LabelWrap,
+		})
+
+		-- Styled container
+		input.FieldFrame = Veil.Instance:Create("Frame", {
+			Name = "FieldFrame",
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundColor3 = COLORS.ToggleOffBackground,
+			BorderSizePixel = 0,
+			Position = UDim2.new(1, 0, 0.5, 0),
+			Size = UDim2.fromOffset(InputFieldWidth, AccessoryButtonHeight),
+			ZIndex = 5,
+			Parent = input.Holder,
+		})
+		createCorner(input.FieldFrame, 6)
+		input.FieldStroke = Veil.Instance:Create("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = COLORS.Stroke,
+			Transparency = STROKE_TRANSPARENCY,
+			Thickness = 1,
+			Parent = input.FieldFrame,
+		})
+		createPadding(input.FieldFrame, 0, 6, 0, 6)
+
+		input.TextBox = Veil.Instance:Create("TextBox", {
+			Name = "TextBox",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ClearTextOnFocus = false,
+			Font = Enum.Font.GothamMedium,
+			PlaceholderColor3 = COLORS.Text,
+			PlaceholderText = input.Placeholder,
+			Size = UDim2.fromScale(1, 1),
+			Text = input.Value,
+			TextColor3 = COLORS.Text,
+			TextSize = 11,
+			TextTransparency = 0.12,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 6,
+			Parent = input.FieldFrame,
+		})
+
+		-- Focus state: brighten stroke
+		local focusTI = TweenInfo.new(InputAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		input.TextBox.Focused:Connect(function()
+			if input.Disabled then
+				input.TextBox:ReleaseFocus()
+				return
+			end
+			TweenService:Create(input.FieldStroke, focusTI, {
+				Transparency = InputFocusStrokeTransparency,
+			}):Play()
+		end)
+
+		input.TextBox.FocusLost:Connect(function(enterPressed)
+			TweenService:Create(input.FieldStroke, focusTI, {
+				Transparency = STROKE_TRANSPARENCY,
+			}):Play()
+
+			local raw = input.TextBox.Text
+
+			-- MaxLength clamp
+			if input.MaxLength and #raw > input.MaxLength then
+				raw = string.sub(raw, 1, input.MaxLength)
+				input.TextBox.Text = raw
+			end
+
+			-- Validator: revert if invalid
+			if input.Validator then
+				local ok, valid = pcall(input.Validator, raw)
+				if not ok or not valid then
+					input.TextBox.Text = input.Value
+					return
+				end
+			end
+
+			if raw ~= input.Value then
+				input.Value = raw
+				if input.Callback then
+					pcall(input.Callback, raw)
+				end
+				input.ChangedSignal:Fire(raw)
+			end
+		end)
+
+		function input:Set(value, opts)
+			opts = opts or {}
+			local v = tostring(value or "")
+			if input.MaxLength and #v > input.MaxLength then
+				v = string.sub(v, 1, input.MaxLength)
+			end
+			self.Value = v
+			self.TextBox.Text = v
+			if not opts.Silent then
+				if self.Callback then pcall(self.Callback, v) end
+				self.ChangedSignal:Fire(v)
+			end
+		end
+
+		function input:GetValue()
+			return self.Value
+		end
+
+		function input:OnChanged(callback)
+			return self.ChangedSignal:Connect(callback)
+		end
+
+		function input:SetDisabled(disabled)
+			self.Disabled = disabled == true
+			self.TextBox.TextEditable = not self.Disabled
+			self.TitleLabel.TextTransparency = self.Disabled and 0.5 or 0
+			self.TextBox.TextTransparency = self.Disabled and 0.5 or 0.12
+			self.FieldFrame.BackgroundTransparency = self.Disabled and 0.4 or 0
+		end
+
+		input:SetDisabled(input.Disabled)
+		return input
 	end
 
 	-- ── Normal Slider ────────────────────────────────────────────────────────

@@ -84,6 +84,29 @@ left:Slider({
 
 local right = homeTab.Columns.rightColumn
 
+right:SectionHeader("Input")
+
+right:Input({
+	Name = "Username",
+	Placeholder = "Enter name...",
+	MaxLength = 32,
+	Callback = function(value)
+		print("Input changed:", value)
+	end,
+})
+
+right:Input({
+	Name = "Port",
+	Default = "25565",
+	Validator = function(v)
+		local n = tonumber(v)
+		return n ~= nil and n >= 1 and n <= 65535
+	end,
+	Callback = function(value)
+		print("Port:", value)
+	end,
+})
+
 right:SectionHeader("Selection")
 
 right:Dropdown({
