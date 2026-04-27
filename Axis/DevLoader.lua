@@ -94,6 +94,20 @@ left:Slider({
 	Subtext = "Camera smoothing amount",
 })
 
+left:SectionHeader("Checkboxes")
+
+left:Checkbox({
+	Name = "Example Checkbox",
+	Default = false,
+	Callback = function(v) print("Checkbox:", v) end,
+})
+
+left:Checkbox({
+	Name = "Example Checkbox",
+	Subtext = "With Subtext",
+	Default = true,
+})
+
 left:SectionHeader("Actions")
 
 left:Button({

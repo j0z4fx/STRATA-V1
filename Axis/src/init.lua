@@ -2160,6 +2160,11 @@ return function(Toolkit, Veil)
 					elementOptions.ColumnFrame = columnApi.Frame
 					return columnApi.Window:_createButton(columnApi.Tab, elementOptions)
 				end,
+				Checkbox = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createCheckbox(columnApi.Tab, elementOptions)
+				end,
 			}
 		end
 
@@ -2202,6 +2207,9 @@ return function(Toolkit, Veil)
 		end
 		function tab:Button(elementOptions)
 			return self.Window:_createButton(self, elementOptions)
+		end
+		function tab:Checkbox(elementOptions)
+			return self.Window:_createCheckbox(self, elementOptions)
 		end
 
 		tab.TabButton.MouseButton1Click:Connect(function()
@@ -4671,6 +4679,204 @@ return function(Toolkit, Veil)
 		btn:SetDisabled(btn.Disabled)
 		registerTabControl(tab, btn)
 		return btn
+	end
+
+	-- ── Checkbox ─────────────────────────────────────────────────────────────
+
+	local CheckboxSize = 18
+	local CheckboxCorner = 4
+	local CheckboxAnimTime = 0.10
+
+	function Window:_createCheckbox(tab, options)
+		options = options or {}
+		local shouldPersist = options.Persist ~= false
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local subtext = options.Subtext or options.Description
+		local hasSubtext = type(subtext) == "string" and subtext ~= ""
+		local rowHeight = hasSubtext and (ToggleRowHeight + 18) or ToggleRowHeight
+
+		local cb = {
+			Type = "Checkbox",
+			Name = options.Name or "Checkbox",
+			Checked = options.Default == true,
+			Disabled = options.Disabled == true,
+			Visible = options.Visible ~= false,
+			Callback = options.Callback,
+			ChangedSignal = Toolkit.Signal.new(),
+			Tab = tab,
+			Window = self,
+		}
+		if shouldPersist then
+			assignPersistKey(tab, cb, options, "Checkbox")
+		end
+
+		cb.Holder = Veil.Instance:Create("Frame", {
+			Name = cb.Name,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			LayoutOrder = type(options.Order) == "number" and options.Order or nextOrder(parentColumn),
+			Size = UDim2.new(1, 0, 0, rowHeight),
+			Visible = cb.Visible,
+			Parent = parentColumn,
+		})
+
+		cb.Button = Veil.Instance:Create("TextButton", {
+			Name = "Hitbox",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 1, 0),
+			Text = "",
+			ZIndex = 6,
+			Parent = cb.Holder,
+		})
+
+		cb.TitleLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Title",
+			AnchorPoint = hasSubtext and Vector2.new(0, 0) or Vector2.new(0, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = hasSubtext and UDim2.fromOffset(0, 6) or UDim2.new(0, 0, 0.5, 0),
+			Size = UDim2.new(1, -(CheckboxSize + 10), 0, 18),
+			Text = cb.Name,
+			TextColor3 = COLORS.Text,
+			TextSize = 14,
+			TextTransparency = 0,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Center,
+			ZIndex = 5,
+			Parent = cb.Holder,
+		})
+
+		if hasSubtext then
+			cb.SubtextLabel = Veil.Instance:Create("TextLabel", {
+				Name = "Subtext",
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Font = Enum.Font.Gotham,
+				Position = UDim2.fromOffset(0, 24),
+				Size = UDim2.new(1, -(CheckboxSize + 10), 0, 16),
+				Text = subtext,
+				TextColor3 = COLORS.Text,
+				TextSize = 12,
+				TextTransparency = 0.35,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				ZIndex = 5,
+				Parent = cb.Holder,
+			})
+		end
+
+		cb.Box = Veil.Instance:Create("Frame", {
+			Name = "Box",
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundColor3 = COLORS.Accent,
+			BackgroundTransparency = cb.Checked and 0 or 1,
+			BorderSizePixel = 0,
+			Position = UDim2.new(1, 0, 0.5, 0),
+			Size = UDim2.fromOffset(CheckboxSize, CheckboxSize),
+			ZIndex = 5,
+			Parent = cb.Holder,
+		})
+		createCorner(cb.Box, CheckboxCorner)
+
+		cb.BoxStroke = Veil.Instance:Create("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = COLORS.Stroke,
+			Transparency = cb.Checked and 0.72 or STROKE_TRANSPARENCY,
+			Thickness = 1.5,
+			Parent = cb.Box,
+		})
+
+		cb.Tick = Veil.Instance:Create("TextLabel", {
+			Name = "Tick",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamBold,
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(CheckboxSize, CheckboxSize),
+			Text = "✓",
+			TextColor3 = COLORS.Window,
+			TextSize = 13,
+			TextTransparency = cb.Checked and 0 or 1,
+			ZIndex = 6,
+			Parent = cb.Box,
+		})
+
+		local animTI = TweenInfo.new(CheckboxAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		local fastTI = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+		local function applyState(checked)
+			TweenService:Create(cb.Box, animTI, { BackgroundTransparency = checked and 0 or 1 }):Play()
+			TweenService:Create(cb.BoxStroke, animTI, { Transparency = checked and 0.72 or STROKE_TRANSPARENCY }):Play()
+			TweenService:Create(cb.Tick, animTI, { TextTransparency = checked and 0 or 1 }):Play()
+		end
+
+		function cb:Set(value)
+			self.Checked = value == true
+			applyState(self.Checked)
+		end
+
+		function cb:GetValue()
+			return self.Checked
+		end
+
+		function cb:OnChanged(fn)
+			return self.ChangedSignal:Connect(fn)
+		end
+
+		function cb:SetVisible(visible)
+			self.Holder.Visible = visible ~= false
+		end
+
+		function cb:RefreshTheme()
+			self.TitleLabel.TextColor3 = COLORS.Text
+			self.Box.BackgroundColor3 = COLORS.Accent
+			self.BoxStroke.Color = COLORS.Stroke
+			self.Tick.TextColor3 = COLORS.Window
+			if self.SubtextLabel then self.SubtextLabel.TextColor3 = COLORS.Text end
+		end
+
+		cb.Button.MouseEnter:Connect(function()
+			if cb.Disabled then return end
+			TweenService:Create(cb.BoxStroke, fastTI, {
+				Transparency = cb.Checked and 0.55 or 0.82,
+			}):Play()
+		end)
+
+		cb.Button.MouseLeave:Connect(function()
+			TweenService:Create(cb.BoxStroke, fastTI, {
+				Transparency = cb.Checked and 0.72 or STROKE_TRANSPARENCY,
+			}):Play()
+		end)
+
+		cb.Button.MouseButton1Down:Connect(function()
+			if cb.Disabled then return end
+			TweenService:Create(cb.Box, fastTI, {
+				Size = UDim2.fromOffset(CheckboxSize - 2, CheckboxSize - 2),
+			}):Play()
+		end)
+
+		cb.Button.MouseButton1Up:Connect(function()
+			TweenService:Create(cb.Box, fastTI, {
+				Size = UDim2.fromOffset(CheckboxSize, CheckboxSize),
+			}):Play()
+		end)
+
+		cb.Button.MouseButton1Click:Connect(function()
+			if cb.Disabled then return end
+			cb.Checked = not cb.Checked
+			applyState(cb.Checked)
+			if cb.Callback then pcall(cb.Callback, cb.Checked) end
+			cb.ChangedSignal:Fire(cb.Checked)
+		end)
+
+		registerTabControl(tab, cb)
+		return cb
 	end
 
 	-- ── Normal Slider ────────────────────────────────────────────────────────
