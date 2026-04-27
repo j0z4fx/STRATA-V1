@@ -5,6 +5,28 @@ return function(Toolkit, Veil)
 	assert(type(Veil.GUI) == "table", "[Axis] Veil.GUI is required")
 	assert(type(Veil.Instance) == "table", "[Axis] Veil.Instance is required")
 
+	-- Polyfills for Luau-only table functions (executor compat)
+	if not table.find then
+		table.find = function(t, value)
+			for i, v in ipairs(t) do
+				if v == value then return i end
+			end
+			return nil
+		end
+	end
+	if not table.clear then
+		table.clear = function(t)
+			for k in pairs(t) do t[k] = nil end
+		end
+	end
+	if not table.clone then
+		table.clone = function(t)
+			local copy = {}
+			for k, v in pairs(t) do copy[k] = v end
+			return copy
+		end
+	end
+
 	local Axis = {
 		Version = "0.0.1",
 		Windows = {},

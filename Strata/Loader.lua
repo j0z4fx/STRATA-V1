@@ -212,13 +212,15 @@ end
 Runtime.Cleanup = cleanupRuntime
 
 local function failLoader(message, detail)
-	statusLabel.Text = message
+	local displayMsg = message
+	if detail ~= nil then
+		displayMsg = message .. ": " .. tostring(detail):sub(1, 80)
+		warn("[Strata Loader]", message, detail)
+	end
+	statusLabel.Text = displayMsg
 	percentLabel.Text = "ERR"
 	barFill.BackgroundTransparency = 0.55
 	barFill.Size = UDim2.new(1, 0, 1, 0)
-	if detail ~= nil then
-		warn("[Strata Loader]", message, detail)
-	end
 	error(message, 0)
 end
 
