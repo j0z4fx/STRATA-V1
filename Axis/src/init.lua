@@ -254,10 +254,10 @@ return function(Toolkit, Veil)
 	end
 
 	function IconProvider:RenderTabIcon(tab, isSelected: boolean)
-		if not tab or not tab.Button or not tab.Button.Parent then
+		if not tab or not tab.TabButton or not tab.TabButton.Parent then
 			return
 		end
-		local parent = tab.Button
+		local parent = tab.TabButton
 		for _, n in ipairs({ "IconVisual", "IconImage", "IconFallback" }) do
 			local old = parent:FindFirstChild(n)
 			if old then
@@ -310,7 +310,7 @@ return function(Toolkit, Veil)
 
 	function IconProvider:RefreshAllTabIcons()
 		for _, tab in ipairs(IconTabRegistry) do
-			if tab and tab.Button and tab.Button.Parent and tab.Window then
+			if tab and tab.TabButton and tab.TabButton.Parent and tab.Window then
 				local selected = tab.Window.SelectedTab
 				IconProvider:RenderTabIcon(tab, selected == tab)
 			end
@@ -1843,7 +1843,7 @@ return function(Toolkit, Veil)
 
 		local buttonParent = tab.PinnedBottom and self.BottomTabHost or self.TabList
 
-		tab.Button = Veil.Instance:Create("TextButton", {
+		tab.TabButton = Veil.Instance:Create("TextButton", {
 			Name = tab.Name .. "TabButton",
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
@@ -1856,12 +1856,12 @@ return function(Toolkit, Veil)
 		})
 		tab.ButtonScale = Veil.Instance:Create("UIScale", {
 			Scale = TabButtonIdleScale,
-			Parent = tab.Button,
+			Parent = tab.TabButton,
 		})
 
 		if tab.PinnedBottom then
-			tab.Button.AnchorPoint = Vector2.new(0.5, 0)
-			tab.Button.Position = UDim2.new(0.5, 0, 0, 0)
+			tab.TabButton.AnchorPoint = Vector2.new(0.5, 0)
+			tab.TabButton.Position = UDim2.new(0.5, 0, 0, 0)
 		end
 
 		tab.Highlight = Veil.Instance:Create("Frame", {
@@ -1871,7 +1871,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Size = UDim2.fromOffset(TabButtonSize, TabButtonSize),
 			ZIndex = 5,
-			Parent = tab.Button,
+			Parent = tab.TabButton,
 		})
 		tab.HighlightScale = Veil.Instance:Create("UIScale", {
 			Scale = TabHighlightIdleScale,
@@ -2001,7 +2001,7 @@ return function(Toolkit, Veil)
 			return self.Window:_createButton(self, elementOptions)
 		end
 
-		tab.Button.MouseButton1Click:Connect(function()
+		tab.TabButton.MouseButton1Click:Connect(function()
 			self:SelectTab(tab)
 		end)
 
