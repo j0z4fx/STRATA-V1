@@ -2175,6 +2175,11 @@ return function(Toolkit, Veil)
 					elementOptions.ColumnFrame = columnApi.Frame
 					return columnApi.Window:_createRadio(columnApi.Tab, elementOptions)
 				end,
+				CurveEditor = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createCurveEditor(columnApi.Tab, elementOptions)
+				end,
 			}
 		end
 
@@ -2226,6 +2231,9 @@ return function(Toolkit, Veil)
 		end
 		function tab:Radio(elementOptions)
 			return self.Window:_createRadio(self, elementOptions)
+		end
+		function tab:CurveEditor(elementOptions)
+			return self.Window:_createCurveEditor(self, elementOptions)
 		end
 
 		tab.TabButton.MouseButton1Click:Connect(function()
@@ -5343,6 +5351,290 @@ return function(Toolkit, Veil)
 
 		registerTabControl(tab, radio)
 		return radio
+	end
+
+	-- ── Curve Editor ─────────────────────────────────────────────────────────
+
+	local CurveCanvasHeight = 140
+	local CurveSegments = 30
+	local CurveLineWidth = 2
+	local CurveHandleSize = 12
+	local CurveHandleInner = 6
+
+	local function bezierPoint(t, a, b, c, d)
+		local mt = 1 - t
+		return mt*mt*mt*a + 3*mt*mt*t*b + 3*mt*t*t*c + t*t*t*d
+	end
+
+	local function posLine(frame, x0, y0, x1, y1, h)
+		local dx, dy = x1 - x0, y1 - y0
+		local len = math.sqrt(dx*dx + dy*dy)
+		frame.Position = UDim2.fromOffset(x0, y0)
+		frame.Size = UDim2.fromOffset(math.max(1, len), h or CurveLineWidth)
+		frame.Rotation = math.deg(math.atan2(dy, dx))
+	end
+
+	function Window:_createCurveEditor(tab, options)
+		options = options or {}
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local defaultCP1 = options.DefaultCP1 or Vector2.new(0.25, 0.75)
+		local defaultCP2 = options.DefaultCP2 or Vector2.new(0.75, 0.25)
+
+		local curve = {
+			Type = "CurveEditor",
+			Name = options.Name or "Curve",
+			CP1 = defaultCP1,
+			CP2 = defaultCP2,
+			Callback = options.Callback,
+			ChangedSignal = Toolkit.Signal.new(),
+			Tab = tab,
+			Window = self,
+			Visible = options.Visible ~= false,
+			Segments = {},
+		}
+
+		local labelHeight = 22
+		local totalHeight = labelHeight + CurveCanvasHeight + 4
+
+		curve.Holder = Veil.Instance:Create("Frame", {
+			Name = curve.Name,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			LayoutOrder = type(options.Order) == "number" and options.Order or nextOrder(parentColumn),
+			Size = UDim2.new(1, 0, 0, totalHeight),
+			Visible = curve.Visible,
+			Parent = parentColumn,
+		})
+
+		Veil.Instance:Create("TextLabel", {
+			Name = "Label",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.fromOffset(0, 0),
+			Size = UDim2.new(1, 0, 0, labelHeight),
+			Text = curve.Name,
+			TextColor3 = COLORS.Text,
+			TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 5,
+			Parent = curve.Holder,
+		})
+
+		curve.Canvas = Veil.Instance:Create("Frame", {
+			Name = "Canvas",
+			BackgroundColor3 = COLORS.Window,
+			BorderSizePixel = 0,
+			ClipsDescendants = true,
+			Position = UDim2.fromOffset(0, labelHeight),
+			Size = UDim2.new(1, 0, 0, CurveCanvasHeight),
+			ZIndex = 5,
+			Parent = curve.Holder,
+		})
+		createCorner(curve.Canvas, 8)
+		createBorder(curve.Canvas)
+
+		-- Subtle grid
+		for i = 1, 3 do
+			local f = i / 4
+			for _, axis in ipairs({"H", "V"}) do
+				Veil.Instance:Create("Frame", {
+					BackgroundColor3 = COLORS.Stroke,
+					BackgroundTransparency = 0.88,
+					BorderSizePixel = 0,
+					Position = axis == "H" and UDim2.fromScale(0, f) or UDim2.fromScale(f, 0),
+					Size = axis == "H" and UDim2.new(1, 0, 0, 1) or UDim2.new(0, 1, 1, 0),
+					ZIndex = 5,
+					Parent = curve.Canvas,
+				})
+			end
+		end
+
+		-- Curve segments
+		for i = 1, CurveSegments do
+			local seg = Veil.Instance:Create("Frame", {
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundColor3 = COLORS.Accent,
+				BorderSizePixel = 0,
+				Position = UDim2.fromOffset(0, 0),
+				Size = UDim2.fromOffset(0, CurveLineWidth),
+				ZIndex = 8,
+				Parent = curve.Canvas,
+			})
+			table.insert(curve.Segments, seg)
+		end
+
+		-- Control lines
+		local ctrlLine1 = Veil.Instance:Create("Frame", {
+			AnchorPoint = Vector2.new(0, 0.5),
+			BackgroundColor3 = COLORS.Stroke,
+			BackgroundTransparency = 0.5,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(0, 1),
+			ZIndex = 7,
+			Parent = curve.Canvas,
+		})
+		local ctrlLine2 = Veil.Instance:Create("Frame", {
+			AnchorPoint = Vector2.new(0, 0.5),
+			BackgroundColor3 = COLORS.Stroke,
+			BackgroundTransparency = 0.5,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(0, 1),
+			ZIndex = 7,
+			Parent = curve.Canvas,
+		})
+
+		-- Handles
+		local function makeHandle()
+			local outer = Veil.Instance:Create("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = COLORS.Window,
+				BorderSizePixel = 0,
+				Position = UDim2.fromOffset(0, 0),
+				Size = UDim2.fromOffset(CurveHandleSize, CurveHandleSize),
+				ZIndex = 10,
+				Parent = curve.Canvas,
+			})
+			createCorner(outer, CurveHandleSize / 2)
+			Veil.Instance:Create("UIStroke", {
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+				Color = COLORS.Accent,
+				Thickness = 1.5,
+				Transparency = 0,
+				Parent = outer,
+			})
+			local inner = Veil.Instance:Create("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = COLORS.Accent,
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(CurveHandleInner, CurveHandleInner),
+				ZIndex = 11,
+				Parent = outer,
+			})
+			createCorner(inner, CurveHandleInner / 2)
+			local btn = Veil.Instance:Create("TextButton", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				AutoButtonColor = false,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(CurveHandleSize + 8, CurveHandleSize + 8),
+				Text = "",
+				ZIndex = 12,
+				Parent = outer,
+			})
+			return outer, btn
+		end
+
+		local h1Outer, h1Btn = makeHandle()
+		local h2Outer, h2Btn = makeHandle()
+
+		local function toCanvasPx(nx, ny, cw, ch)
+			return nx * cw, (1 - ny) * ch
+		end
+
+		local function redraw()
+			local cw = curve.Canvas.AbsoluteSize.X
+			local ch = curve.Canvas.AbsoluteSize.Y
+			if cw <= 0 or ch <= 0 then return end
+			local cp1, cp2 = curve.CP1, curve.CP2
+
+			for i = 1, CurveSegments do
+				local t0 = (i - 1) / CurveSegments
+				local t1 = i / CurveSegments
+				local bx0 = bezierPoint(t0, 0, cp1.X, cp2.X, 1)
+				local by0 = bezierPoint(t0, 0, cp1.Y, cp2.Y, 1)
+				local bx1 = bezierPoint(t1, 0, cp1.X, cp2.X, 1)
+				local by1 = bezierPoint(t1, 0, cp1.Y, cp2.Y, 1)
+				local x0, y0 = toCanvasPx(bx0, by0, cw, ch)
+				local x1, y1 = toCanvasPx(bx1, by1, cw, ch)
+				posLine(curve.Segments[i], x0, y0, x1, y1)
+			end
+
+			local cp1x, cp1y = toCanvasPx(cp1.X, cp1.Y, cw, ch)
+			local cp2x, cp2y = toCanvasPx(cp2.X, cp2.Y, cw, ch)
+			h1Outer.Position = UDim2.fromOffset(cp1x, cp1y)
+			h2Outer.Position = UDim2.fromOffset(cp2x, cp2y)
+
+			posLine(ctrlLine1, 0, ch, cp1x, cp1y, 1)
+			posLine(ctrlLine2, cp2x, cp2y, cw, 0, 1)
+		end
+
+		curve._redraw = redraw
+
+		local dragging = nil
+		h1Btn.MouseButton1Down:Connect(function() dragging = 1 end)
+		h2Btn.MouseButton1Down:Connect(function() dragging = 2 end)
+
+		local dragConn = UserInputService.InputChanged:Connect(function(inp)
+			if not dragging then return end
+			if inp.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+			local absPos = curve.Canvas.AbsolutePosition
+			local absSize = curve.Canvas.AbsoluteSize
+			if absSize.X <= 0 then return end
+			local mx = UserInputService:GetMouseLocation()
+			local nx = math.clamp((mx.X - absPos.X) / absSize.X, 0, 1)
+			local ny = math.clamp(1 - (mx.Y - absPos.Y) / absSize.Y, 0, 1)
+			if dragging == 1 then curve.CP1 = Vector2.new(nx, ny)
+			else curve.CP2 = Vector2.new(nx, ny) end
+			redraw()
+			local pts = { CP1 = curve.CP1, CP2 = curve.CP2 }
+			if curve.Callback then pcall(curve.Callback, pts) end
+			curve.ChangedSignal:Fire(pts)
+		end)
+
+		local endConn = UserInputService.InputEnded:Connect(function(inp)
+			if inp.UserInputType == Enum.UserInputType.MouseButton1 then dragging = nil end
+		end)
+
+		curve.Canvas.AncestryChanged:Connect(function()
+			if not curve.Canvas.Parent then
+				dragConn:Disconnect()
+				endConn:Disconnect()
+			end
+		end)
+
+		task.spawn(function()
+			task.wait(0.05)
+			redraw()
+		end)
+
+		function curve:GetPoints()
+			return { CP1 = self.CP1, CP2 = self.CP2 }
+		end
+
+		function curve:GetSampled(count)
+			count = count or 16
+			local out = {}
+			for i = 0, count do
+				local t = i / count
+				out[i + 1] = bezierPoint(t, 0, self.CP1.Y, self.CP2.Y, 1)
+			end
+			return out
+		end
+
+		function curve:OnChanged(fn)
+			return self.ChangedSignal:Connect(fn)
+		end
+
+		function curve:SetVisible(visible)
+			self.Holder.Visible = visible ~= false
+		end
+
+		function curve:RefreshTheme()
+			self.Canvas.BackgroundColor3 = COLORS.Window
+			for _, seg in ipairs(self.Segments) do
+				seg.BackgroundColor3 = COLORS.Accent
+			end
+			self._redraw()
+		end
+
+		registerTabControl(tab, curve)
+		return curve
 	end
 
 	-- ── Normal Slider ────────────────────────────────────────────────────────

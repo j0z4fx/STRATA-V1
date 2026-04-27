@@ -208,6 +208,15 @@ middle:Radio({
 	Callback = function(v) print("Radio horizontal:", v) end,
 })
 
+middle:SectionHeader("Curve Editor")
+
+middle:CurveEditor({
+	Name = "Easing Curve",
+	Callback = function(pts)
+		print("CP1:", pts.CP1, "CP2:", pts.CP2)
+	end,
+})
+
 middle:SectionHeader("Notched")
 
 middle:NotchedSlider({
