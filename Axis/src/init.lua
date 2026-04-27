@@ -6987,6 +6987,129 @@ return function(Toolkit, Veil)
 		end
 	end
 
+	-- ── Keybind Overlay ──────────────────────────────────────────────────────
+
+	function Axis:CreateKeybindOverlay(options)
+		options = options or {}
+		local binds = options.Binds or options.Keys or {}
+		local toggleKey = options.Keybind or options.ToggleKey or Enum.KeyCode.RightAlt
+		local positionMode = options.Position or "BottomRight"
+		local visible = options.Visible ~= false
+
+		local panelWidth = 220
+		local rowHeight = 28
+		local padH = 10
+		local padV = 8
+		local panelHeight = padV * 2 + #binds * rowHeight
+
+		local panel = Veil.Instance:Create("Frame", {
+			Name = "KeybindOverlay",
+			AnchorPoint = positionMode == "BottomRight" and Vector2.new(1, 1)
+				or positionMode == "BottomLeft" and Vector2.new(0, 1)
+				or positionMode == "TopRight" and Vector2.new(1, 0)
+				or Vector2.new(0, 0),
+			BackgroundColor3 = COLORS.Window,
+			BorderSizePixel = 0,
+			Position = positionMode == "BottomRight" and UDim2.new(1, -16, 1, -16)
+				or positionMode == "BottomLeft" and UDim2.new(0, 16, 1, -16)
+				or positionMode == "TopRight" and UDim2.new(1, -16, 0, 16)
+				or UDim2.new(0, 16, 0, 16),
+			Size = UDim2.fromOffset(panelWidth, panelHeight),
+			Visible = visible,
+			ZIndex = 190,
+			Parent = self.Surface,
+		})
+		createCorner(panel, 10)
+		createBorder(panel)
+
+		-- Header
+		Veil.Instance:Create("TextLabel", {
+			AnchorPoint = Vector2.new(0, 0),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.fromOffset(padH, padV - 2),
+			Size = UDim2.new(1, -padH * 2, 0, 16),
+			Text = options.Title or "Keybinds",
+			TextColor3 = COLORS.Text,
+			TextSize = 11,
+			TextTransparency = 0.5,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 191,
+			Parent = panel,
+		})
+
+		for i, bind in ipairs(binds) do
+			local y = padV + (i - 1) * rowHeight + 14
+
+			Veil.Instance:Create("TextLabel", {
+				AnchorPoint = Vector2.new(0, 0),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Font = Enum.Font.GothamMedium,
+				Position = UDim2.fromOffset(padH, y),
+				Size = UDim2.new(0.65, -padH, 0, rowHeight),
+				Text = bind.Name or bind.Action or "Action",
+				TextColor3 = COLORS.Text,
+				TextSize = 12,
+				TextTransparency = bind.Active == false and 0.5 or 0,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				ZIndex = 191,
+				Parent = panel,
+			})
+
+			local keyBadge = Veil.Instance:Create("TextLabel", {
+				AnchorPoint = Vector2.new(1, 0.5),
+				BackgroundColor3 = COLORS.Stroke,
+				BackgroundTransparency = 0.88,
+				BorderSizePixel = 0,
+				Font = Enum.Font.GothamMedium,
+				Position = UDim2.new(1, -padH, 0, y + rowHeight / 2),
+				Size = UDim2.fromOffset(0, 18),
+				AutomaticSize = Enum.AutomaticSize.X,
+				Text = bind.Key or bind.KeyCode or "?",
+				TextColor3 = COLORS.Text,
+				TextSize = 10,
+				TextTransparency = bind.Active == false and 0.5 or 0.2,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				ZIndex = 191,
+				Parent = panel,
+			})
+			createCorner(keyBadge, 4)
+			createPadding(keyBadge, 0, 5, 0, 5)
+		end
+
+		-- Toggle keybind
+		local overlay = {
+			Panel = panel,
+			Visible = visible,
+			ToggleKey = toggleKey,
+		}
+
+		local conn = UserInputService.InputBegan:Connect(function(inp, processed)
+			if processed then return end
+			if inp.KeyCode == toggleKey then
+				overlay.Visible = not overlay.Visible
+				panel.Visible = overlay.Visible
+			end
+		end)
+
+		panel.AncestryChanged:Connect(function()
+			if not panel.Parent then conn:Disconnect() end
+		end)
+
+		function overlay:Show() self.Visible = true; panel.Visible = true end
+		function overlay:Hide() self.Visible = false; panel.Visible = false end
+		function overlay:Toggle() if self.Visible then self:Hide() else self:Show() end end
+		function overlay:Destroy()
+			conn:Disconnect()
+			Veil.Instance:SecureDestroy(panel)
+		end
+
+		return overlay
+	end
+
 	-- ── Search Modal ─────────────────────────────────────────────────────────
 
 	local SearchModalWidth = 480
