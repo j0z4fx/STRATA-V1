@@ -60,11 +60,11 @@ return function(Toolkit, Veil)
 	local ToggleRowWithSubtextHeight = 52
 	local ToggleSwitchWidth = 34
 	local ToggleSwitchHeight = 20
-	local ToggleDotSize = 12
+	local ToggleDotSize = 11
 	local ToggleAnimationTime = 0.22
 	local ToggleHoverStrokeTransparency = 0.82
 	local TogglePressAnimTime = 0.08
-	local ToggleDotPressSize = 10
+	local ToggleDotPressSize = 9
 	local ToggleTooltipDelay = 0.8
 	local TooltipOffset = Vector2.new(16, -10)
 	local TooltipMaxWidth = 260
@@ -2662,7 +2662,7 @@ return function(Toolkit, Veil)
 			ChangedSignal = Toolkit.Signal.new(),
 		}
 
-		local hue, sat, val = Color3.toHSV(initialColor)
+		local hue, sat, val = initialColor:ToHSV()
 		colorpicker.Hue = hue
 		colorpicker.Sat = sat
 		colorpicker.Val = val
@@ -2897,7 +2897,7 @@ return function(Toolkit, Veil)
 			end
 
 			local changed = self.Value ~= value
-			self.Hue, self.Sat, self.Val = Color3.toHSV(value)
+			self.Hue, self.Sat, self.Val = value:ToHSV()
 			self:_refreshVisuals()
 
 			if changed and setOptions.Silent ~= true then
@@ -3205,10 +3205,10 @@ return function(Toolkit, Veil)
 
 		toggle.SwitchDot = Veil.Instance:Create("Frame", {
 			Name = "Dot",
-			AnchorPoint = Vector2.new(0, 0.5),
+			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = COLORS.ToggleOffDot,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(2, ToggleSwitchHeight / 2),
+			Position = UDim2.fromOffset(2 + (ToggleDotSize * 0.5), ToggleSwitchHeight * 0.5),
 			Size = UDim2.fromOffset(ToggleDotSize, ToggleDotSize),
 			ZIndex = 6,
 			Parent = toggle.Switch,
@@ -3227,11 +3227,11 @@ return function(Toolkit, Veil)
 			visualOptions = visualOptions or {}
 			local instant = visualOptions.Instant == true
 			local disabled = self.Disabled
-			local dotOnX = ToggleSwitchWidth - ToggleDotSize - 3
-			local dotOffX = 2
+			local dotOffX = 2 + (ToggleDotSize * 0.5)
+			local dotOnX = ToggleSwitchWidth - 3 - (ToggleDotSize * 0.5) - 1
 			local targetBackground = value and COLORS.Accent or COLORS.ToggleOffBackground
 			local targetDotColor = value and COLORS.ToggleOnDot or COLORS.ToggleOffDot
-			local targetDotPosition = UDim2.fromOffset(value and dotOnX or dotOffX, ToggleSwitchHeight / 2)
+			local targetDotPosition = UDim2.fromOffset(value and dotOnX or dotOffX, ToggleSwitchHeight * 0.5)
 			local titleTransparency = disabled and 0.45 or 0
 			local subtextTransparency = disabled and 0.6 or 0.35
 			local switchTransparency = disabled and 0.25 or 0

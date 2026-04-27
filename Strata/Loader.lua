@@ -211,11 +211,14 @@ end
 
 Runtime.Cleanup = cleanupRuntime
 
-local function failLoader(message)
+local function failLoader(message, detail)
 	statusLabel.Text = message
 	percentLabel.Text = "ERR"
 	barFill.BackgroundTransparency = 0.55
 	barFill.Size = UDim2.new(1, 0, 1, 0)
+	if detail ~= nil then
+		warn("[Strata Loader]", message, detail)
+	end
 	error(message, 0)
 end
 
@@ -434,13 +437,13 @@ for index, step in ipairs(steps) do
 	updateLoader(step.Text, percent)
 	task.wait(perStepDelay)
 
-	local ok = true
+	local ok, result = true, nil
 	if type(step.Run) == "function" then
-		ok = pcall(step.Run)
+		ok, result = pcall(step.Run)
 	end
 
 	if not ok then
-		failLoader(step.Error)
+		failLoader(step.Error, result)
 	end
 end
 
