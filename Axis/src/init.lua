@@ -141,7 +141,7 @@ return function(Toolkit, Veil)
 		"ToggleOffDot",
 		"ToggleOnDot",
 	}
-	local IconTabRegistry: { any } = {}
+	local IconTabRegistry = {}
 
 	local function colorToHex(color)
 		if typeof(color) ~= "Color3" then
@@ -181,7 +181,7 @@ return function(Toolkit, Veil)
 		return fallback
 	end
 
-	local function normalizeIconAssetData(raw: any): { Image: string, ImageRectSize: Vector2, ImageRectOffset: Vector2 }?
+	local function normalizeIconAssetData(raw)
 		if type(raw) ~= "table" then
 			return nil
 		end
@@ -198,14 +198,14 @@ return function(Toolkit, Veil)
 
 	-- j0z4fx phosphor-roblox-direct uses per-icon name keys (e.g. house-line, gear-six); first arg to GetAsset is the exact key.
 	-- Add Lucide -> Phosphor aliases here when a tab icon does not share the same id.
-	local LUCIDE_TO_PHOSPHOR_ICON: { [string]: string } = {
+	local LUCIDE_TO_PHOSPHOR_ICON = {
 		house = "house-line",
 		["user-round"] = "user-circle",
 		settings = "gear-six",
 	}
-	local function getPhosphorNameCandidates(semantic: string): { string }
+	local function getPhosphorNameCandidates(semantic)
 		local key = string.lower(semantic)
-		local out: { string } = {}
+		local out = {}
 		local alias = LUCIDE_TO_PHOSPHOR_ICON[key]
 		if alias then
 			table.insert(out, alias)
@@ -261,12 +261,12 @@ return function(Toolkit, Veil)
 		return nil
 	end
 
-	function IconProvider:Get(name, options: any?)
+	function IconProvider:Get(name, options)
 		if type(name) ~= "string" or name == "" then
 			return nil
 		end
-		local opts: any = type(options) == "table" and options or {}
-		local phosWeight: string? = if type(opts.Weight) == "string" then opts.Weight elseif type(opts.weight) == "string" then opts.weight else nil
+		local opts = type(options) == "table" and options or {}
+		local phosWeight = (type(opts.Weight) == "string" and opts.Weight) or (type(opts.weight) == "string" and opts.weight) or nil
 		if self.ActivePack == "Lucide" then
 			local pack = self:LoadLucide()
 			if pack and type(pack.GetAsset) == "function" then
@@ -281,7 +281,7 @@ return function(Toolkit, Veil)
 		if not (pack and type(pack.GetAsset) == "function") then
 			return nil
 		end
-		local w: string = (phosWeight == "fill" or phosWeight == "regular") and phosWeight or "regular"
+		local w = (phosWeight == "fill" or phosWeight == "regular") and phosWeight or "regular"
 		for _, cname in getPhosphorNameCandidates(name) do
 			local ok, raw = pcall(pack.GetAsset, cname, w)
 			if ok then
@@ -306,7 +306,7 @@ return function(Toolkit, Veil)
 		return nil
 	end
 
-	function IconProvider:RenderTabIcon(tab, isSelected: boolean)
+	function IconProvider:RenderTabIcon(tab, isSelected)
 		if not tab or not tab.TabButton or not tab.TabButton.Parent then
 			return
 		end
@@ -318,8 +318,8 @@ return function(Toolkit, Veil)
 			end
 		end
 		tab.IconVisual = nil
-		local tint: Color3 = (isSelected and COLORS.Accent) or InactiveIconColor
-		local options: { Weight: string }? = nil
+		local tint = (isSelected and COLORS.Accent) or InactiveIconColor
+		local options = nil
 		if self.ActivePack == "Phosphor" then
 			options = { Weight = isSelected and "fill" or "regular" }
 		end
@@ -370,7 +370,7 @@ return function(Toolkit, Veil)
 		end
 	end
 
-	function IconProvider:SetPack(packName: string)
+	function IconProvider:SetPack(packName)
 		if self.ActivePack == packName then
 			return
 		end
