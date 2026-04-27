@@ -282,7 +282,7 @@ return function(Toolkit, Veil)
 			return nil
 		end
 		local w = (phosWeight == "fill" or phosWeight == "regular") and phosWeight or "regular"
-		for _, cname in getPhosphorNameCandidates(name) do
+		for _, cname in ipairs(getPhosphorNameCandidates(name)) do
 			local ok, raw = pcall(pack.GetAsset, cname, w)
 			if ok then
 				local n = normalizeIconAssetData(raw)
@@ -293,7 +293,7 @@ return function(Toolkit, Veil)
 		end
 		-- If fill failed (some glyphs), fall back to regular for the same candidate set
 		if w == "fill" then
-			for _, cname in getPhosphorNameCandidates(name) do
+			for _, cname in ipairs(getPhosphorNameCandidates(name)) do
 				local ok, raw = pcall(pack.GetAsset, cname, "regular")
 				if ok then
 					local n = normalizeIconAssetData(raw)
