@@ -2155,6 +2155,11 @@ return function(Toolkit, Veil)
 					elementOptions.ColumnFrame = columnApi.Frame
 					return columnApi.Window:_createInput(columnApi.Tab, elementOptions)
 				end,
+				SecureInput = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createSecureInput(columnApi.Tab, elementOptions)
+				end,
 				Button = function(columnApi, elementOptions)
 					elementOptions = elementOptions or {}
 					elementOptions.ColumnFrame = columnApi.Frame
@@ -2209,6 +2214,9 @@ return function(Toolkit, Veil)
 		end
 		function tab:Input(elementOptions)
 			return self.Window:_createInput(self, elementOptions)
+		end
+		function tab:SecureInput(elementOptions)
+			return self.Window:_createSecureInput(self, elementOptions)
 		end
 		function tab:Button(elementOptions)
 			return self.Window:_createButton(self, elementOptions)
@@ -4559,6 +4567,208 @@ return function(Toolkit, Veil)
 		end
 		registerTabControl(tab, input)
 		return input
+	end
+
+	-- ── Secure Input ─────────────────────────────────────────────────────────
+
+	local BULLET = "•"
+
+	function Window:_createSecureInput(tab, options)
+		options = options or {}
+		local shouldPersist = options.Persist ~= false
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local defaultVal = tostring(options.Default or options.Value or "")
+
+		local sinput = {
+			Type = "SecureInput",
+			Name = options.Name or "SecureInput",
+			Value = defaultVal,
+			Placeholder = options.Placeholder or "",
+			MaxLength = tonumber(options.MaxLength),
+			Validator = type(options.Validator) == "function" and options.Validator or nil,
+			Disabled = options.Disabled == true,
+			Visible = options.Visible ~= false,
+			Callback = options.Callback,
+			ChangedSignal = Toolkit.Signal.new(),
+			Tab = tab,
+			Window = self,
+		}
+		if shouldPersist then
+			assignPersistKey(tab, sinput, options, "SecureInput")
+		end
+
+		sinput.Holder = Veil.Instance:Create("Frame", {
+			Name = sinput.Name,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			LayoutOrder = type(options.Order) == "number" and options.Order or nextOrder(parentColumn),
+			Size = UDim2.new(1, 0, 0, InputRowHeight),
+			Visible = sinput.Visible,
+			Parent = parentColumn,
+		})
+
+		local rightReserved = InputFieldWidth + 8
+
+		sinput.LabelWrap = Veil.Instance:Create("Frame", {
+			Name = "LabelWrap",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, -rightReserved, 1, 0),
+			ZIndex = 5,
+			Parent = sinput.Holder,
+		})
+
+		sinput.TitleLabel = Veil.Instance:Create("TextLabel", {
+			Name = "Title",
+			AnchorPoint = Vector2.new(0, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.GothamMedium,
+			Position = UDim2.new(0, 0, 0.5, 0),
+			Size = UDim2.new(1, 0, 0, 18),
+			Text = sinput.Name,
+			TextColor3 = COLORS.Text,
+			TextSize = 14,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 5,
+			Parent = sinput.LabelWrap,
+		})
+
+		sinput.FieldFrame = Veil.Instance:Create("Frame", {
+			Name = "FieldFrame",
+			AnchorPoint = Vector2.new(1, 0.5),
+			BackgroundColor3 = COLORS.ToggleOffBackground,
+			BorderSizePixel = 0,
+			Position = UDim2.new(1, 0, 0.5, 0),
+			Size = UDim2.fromOffset(InputFieldWidth, AccessoryButtonHeight),
+			ZIndex = 5,
+			Parent = sinput.Holder,
+		})
+		createCorner(sinput.FieldFrame, 6)
+		sinput.FieldStroke = Veil.Instance:Create("UIStroke", {
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Color = COLORS.Stroke,
+			Transparency = STROKE_TRANSPARENCY,
+			Thickness = 1,
+			Parent = sinput.FieldFrame,
+		})
+		createPadding(sinput.FieldFrame, 0, 6, 0, 6)
+
+		-- TextBox shows only bullets; real value tracked separately
+		local displayCount = utf8.len(defaultVal) or 0
+		local maskText = string.rep(BULLET, displayCount)
+
+		sinput.TextBox = Veil.Instance:Create("TextBox", {
+			Name = "TextBox",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ClearTextOnFocus = false,
+			Font = Enum.Font.GothamMedium,
+			PlaceholderColor3 = COLORS.Text,
+			PlaceholderText = sinput.Placeholder,
+			Size = UDim2.fromScale(1, 1),
+			Text = maskText,
+			TextColor3 = COLORS.Text,
+			TextSize = 11,
+			TextTransparency = 0.12,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			ZIndex = 6,
+			Parent = sinput.FieldFrame,
+		})
+		self:_applySelectionHighlight(sinput.TextBox)
+
+		-- Masking logic
+		local isUpdating = false
+		sinput.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+			if isUpdating then return end
+			local txt = sinput.TextBox.Text
+			local newCount = utf8.len(txt) or 0
+
+			if newCount > displayCount then
+				-- Extract newly typed chars (non-bullet suffix)
+				local existingBytes = #string.rep(BULLET, displayCount)
+				local addedRaw = txt:sub(existingBytes + 1)
+				sinput.Value = sinput.Value .. addedRaw
+				if sinput.MaxLength and #sinput.Value > sinput.MaxLength then
+					sinput.Value = sinput.Value:sub(1, sinput.MaxLength)
+				end
+			elseif newCount < displayCount then
+				-- Deletion: trim real value by same delta
+				local delta = displayCount - newCount
+				sinput.Value = sinput.Value:sub(1, math.max(0, #sinput.Value - delta))
+			end
+
+			displayCount = utf8.len(sinput.Value) or 0
+			isUpdating = true
+			sinput.TextBox.Text = string.rep(BULLET, displayCount)
+			isUpdating = false
+		end)
+
+		local focusTI = TweenInfo.new(InputAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		sinput.TextBox.Focused:Connect(function()
+			if sinput.Disabled then sinput.TextBox:ReleaseFocus() return end
+			TweenService:Create(sinput.FieldStroke, focusTI, { Transparency = InputFocusStrokeTransparency }):Play()
+		end)
+
+		sinput.TextBox.FocusLost:Connect(function()
+			TweenService:Create(sinput.FieldStroke, focusTI, { Transparency = STROKE_TRANSPARENCY }):Play()
+			local val = sinput.Value
+			if sinput.Validator then
+				local ok, valid = pcall(sinput.Validator, val)
+				if not ok or not valid then
+					sinput.Value = ""
+					displayCount = 0
+					sinput.TextBox.Text = ""
+					return
+				end
+			end
+			if sinput.Callback then pcall(sinput.Callback, val) end
+			sinput.ChangedSignal:Fire(val)
+		end)
+
+		function sinput:Set(value)
+			self.Value = tostring(value or "")
+			displayCount = utf8.len(self.Value) or 0
+			self.TextBox.Text = string.rep(BULLET, displayCount)
+		end
+
+		function sinput:GetValue()
+			return self.Value
+		end
+
+		function sinput:OnChanged(fn)
+			return self.ChangedSignal:Connect(fn)
+		end
+
+		function sinput:SetDisabled(disabled)
+			self.Disabled = disabled == true
+			self.TextBox.TextEditable = not self.Disabled
+			self.TitleLabel.TextTransparency = self.Disabled and 0.5 or 0
+			self.TextBox.TextTransparency = self.Disabled and 0.5 or 0.12
+			self.FieldFrame.BackgroundTransparency = self.Disabled and 0.4 or 0
+		end
+
+		function sinput:SetVisible(visible)
+			self.Visible = visible ~= false
+			self.Holder.Visible = self.Visible
+		end
+
+		function sinput:RefreshTheme()
+			self.TitleLabel.TextColor3 = COLORS.Text
+			self.FieldFrame.BackgroundColor3 = COLORS.ToggleOffBackground
+			self.TextBox.TextColor3 = COLORS.Text
+			self.TextBox.PlaceholderColor3 = COLORS.Text
+			self.FieldStroke.Color = COLORS.Stroke
+		end
+
+		sinput:SetDisabled(sinput.Disabled)
+		registerTabControl(tab, sinput)
+		return sinput
 	end
 
 	-- ── Button ───────────────────────────────────────────────────────────────

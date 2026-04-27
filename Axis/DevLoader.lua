@@ -129,6 +129,14 @@ local right = homeTab.Columns.rightColumn
 
 right:SectionHeader("Input")
 
+right:SecureInput({
+	Name = "Password",
+	Placeholder = "••••••••",
+	Callback = function(value)
+		print("Password set (length):", #value)
+	end,
+})
+
 right:Input({
 	Name = "Username",
 	Placeholder = "Enter name...",
