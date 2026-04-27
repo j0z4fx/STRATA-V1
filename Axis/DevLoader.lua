@@ -240,6 +240,15 @@ middle:RangeSlider({
 	Subtext = "Minimum and maximum range",
 })
 
+-- Crosshair system (creates its own "Crosshair" tab)
+Axis:CreateCrosshair(window, {
+	Color = Color3.fromRGB(255, 255, 255),
+	Width = 2,
+	Length = 8,
+	Gap = 3,
+	Opacity = 1,
+})
+
 -- Character viewer (appears beside window when Profile tab active)
 Axis:CreateCharacterViewer(window)
 

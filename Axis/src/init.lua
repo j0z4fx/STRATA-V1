@@ -6999,6 +6999,281 @@ return function(Toolkit, Veil)
 		end
 	end
 
+	-- ── Crosshair ────────────────────────────────────────────────────────────
+
+	function Axis:CreateCrosshair(sourceWindow, options)
+		options = options or {}
+
+		-- Default state
+		local state = {
+			Enabled = true,
+			Color = options.Color or Color3.fromRGB(255, 255, 255),
+			Width = options.Width or 2,
+			Length = options.Length or 8,
+			Gap = options.Gap or 3,
+			Opacity = options.Opacity or 1,
+			DotEnabled = options.DotEnabled == true,
+			DotSize = options.DotSize or 4,
+			OutlineEnabled = options.OutlineEnabled == true,
+			OutlineColor = options.OutlineColor or Color3.new(0, 0, 0),
+			Animation = options.Animation or "None",
+		}
+
+		-- Crosshair surface (full-screen, above game UI but below Axis)
+		local surface = Veil.Instance:Create("Frame", {
+			Name = "CrosshairSurface",
+			Active = false,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Interactable = false,
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 150,
+			Parent = self.Surface,
+		})
+
+		-- Inner container: centered, can be rotated for spin
+		local container = Veil.Instance:Create("Frame", {
+			Name = "CrosshairContainer",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Interactable = false,
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(100, 100),
+			ZIndex = 151,
+			Parent = surface,
+		})
+
+		-- Create arm frame
+		local function makeArm(name, zIndex)
+			return Veil.Instance:Create("Frame", {
+				Name = name,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = state.Color,
+				BackgroundTransparency = 1 - state.Opacity,
+				BorderSizePixel = 0,
+				Interactable = false,
+				ZIndex = zIndex,
+				Parent = container,
+			})
+		end
+
+		-- Outline arms (drawn first, behind)
+		local oTop    = makeArm("OTop",    151)
+		local oBottom = makeArm("OBottom", 151)
+		local oLeft   = makeArm("OLeft",   151)
+		local oRight  = makeArm("ORight",  151)
+
+		-- Main arms
+		local aTop    = makeArm("Top",    152)
+		local aBottom = makeArm("Bottom", 152)
+		local aLeft   = makeArm("Left",   152)
+		local aRight  = makeArm("Right",  152)
+
+		-- Center dot
+		local dot = Veil.Instance:Create("Frame", {
+			Name = "Dot",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			BackgroundColor3 = state.Color,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Interactable = false,
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(state.DotSize, state.DotSize),
+			ZIndex = 153,
+			Parent = container,
+		})
+		createCorner(dot, state.DotSize / 2)
+
+		local function applyGeometry()
+			local w = state.Width
+			local l = state.Length
+			local g = state.Gap
+			local cx, cy = 50, 50  -- center of 100x100 container
+
+			-- Top arm
+			aTop.Position = UDim2.fromOffset(cx, cy - g - l / 2)
+			aTop.Size = UDim2.fromOffset(w, l)
+			-- Bottom arm
+			aBottom.Position = UDim2.fromOffset(cx, cy + g + l / 2)
+			aBottom.Size = UDim2.fromOffset(w, l)
+			-- Left arm
+			aLeft.Position = UDim2.fromOffset(cx - g - l / 2, cy)
+			aLeft.Size = UDim2.fromOffset(l, w)
+			-- Right arm
+			aRight.Position = UDim2.fromOffset(cx + g + l / 2, cy)
+			aRight.Size = UDim2.fromOffset(l, w)
+
+			local outlineAlpha = state.OutlineEnabled and 0.72 or 1
+			local ow = w + 2
+			oTop.Position    = UDim2.fromOffset(cx, cy - g - l / 2)
+			oTop.Size        = UDim2.fromOffset(ow, l + 2)
+			oBottom.Position = UDim2.fromOffset(cx, cy + g + l / 2)
+			oBottom.Size     = UDim2.fromOffset(ow, l + 2)
+			oLeft.Position   = UDim2.fromOffset(cx - g - l / 2, cy)
+			oLeft.Size       = UDim2.fromOffset(l + 2, ow)
+			oRight.Position  = UDim2.fromOffset(cx + g + l / 2, cy)
+			oRight.Size      = UDim2.fromOffset(l + 2, ow)
+
+			for _, arm in ipairs({oTop, oBottom, oLeft, oRight}) do
+				arm.BackgroundColor3 = state.OutlineColor
+				arm.BackgroundTransparency = outlineAlpha
+			end
+
+			dot.Size = UDim2.fromOffset(state.DotSize, state.DotSize)
+			dot.BackgroundTransparency = state.DotEnabled and (1 - state.Opacity) or 1
+		end
+
+		local function applyColor()
+			for _, arm in ipairs({aTop, aBottom, aLeft, aRight, dot}) do
+				arm.BackgroundColor3 = state.Color
+				arm.BackgroundTransparency = 1 - state.Opacity
+			end
+			dot.BackgroundTransparency = state.DotEnabled and (1 - state.Opacity) or 1
+		end
+
+		applyGeometry()
+		applyColor()
+		surface.Visible = state.Enabled
+
+		-- Animation
+		local animAngle = 0
+		local pulseSize = 1
+		local pulseDelta = 1
+		local animConn = RunService.Heartbeat:Connect(function(dt)
+			if not state.Enabled or not surface.Visible then return end
+			if state.Animation == "Spin" then
+				animAngle = animAngle + 30 * dt
+				container.Rotation = animAngle
+			elseif state.Animation == "Pulse" then
+				pulseSize = pulseSize + pulseDelta * 20 * dt
+				if pulseSize >= 110 then pulseDelta = -1
+				elseif pulseSize <= 90 then pulseDelta = 1 end
+				container.Size = UDim2.fromOffset(pulseSize, pulseSize)
+			else
+				container.Rotation = 0
+				container.Size = UDim2.fromOffset(100, 100)
+			end
+		end)
+
+		surface.AncestryChanged:Connect(function()
+			if not surface.Parent then animConn:Disconnect() end
+		end)
+
+		-- Build config tab in source window
+		if sourceWindow then
+			local crosshairTab = sourceWindow:CreateTab({
+				Name = "Crosshair",
+				Icon = "crosshair",
+			})
+			local col = crosshairTab.Columns.leftColumn
+
+			col:CreateToggle({
+				Name = "Show Crosshair",
+				Default = state.Enabled,
+				Callback = function(v)
+					state.Enabled = v
+					surface.Visible = v
+				end,
+			})
+
+			col:SectionHeader("Appearance")
+
+			local colorLabel = col:Label({ Name = "Color" })
+			colorLabel:AddColorpicker({
+				Default = state.Color,
+				Callback = function(c)
+					state.Color = c
+					applyColor()
+				end,
+			})
+
+			col:Slider({
+				Name = "Thickness",
+				Min = 1, Max = 8, Default = state.Width, Step = 1,
+				Callback = function(v) state.Width = v; applyGeometry() end,
+			})
+
+			col:Slider({
+				Name = "Length",
+				Min = 2, Max = 30, Default = state.Length, Step = 1,
+				Callback = function(v) state.Length = v; applyGeometry() end,
+			})
+
+			col:Slider({
+				Name = "Gap",
+				Min = 0, Max = 20, Default = state.Gap, Step = 1,
+				Callback = function(v) state.Gap = v; applyGeometry() end,
+			})
+
+			col:Slider({
+				Name = "Opacity",
+				Min = 0, Max = 1, Default = state.Opacity, Step = 0.05,
+				Callback = function(v) state.Opacity = v; applyColor() end,
+			})
+
+			col:SectionHeader("Center Dot")
+
+			col:CreateToggle({
+				Name = "Dot",
+				Default = state.DotEnabled,
+				Callback = function(v)
+					state.DotEnabled = v
+					dot.BackgroundTransparency = v and (1 - state.Opacity) or 1
+				end,
+			})
+
+			col:Slider({
+				Name = "Dot Size",
+				Min = 1, Max = 12, Default = state.DotSize, Step = 1,
+				Callback = function(v)
+					state.DotSize = v
+					dot.Size = UDim2.fromOffset(v, v)
+					createCorner(dot, v / 2)
+				end,
+			})
+
+			col:SectionHeader("Outline")
+
+			col:CreateToggle({
+				Name = "Outline",
+				Default = state.OutlineEnabled,
+				Callback = function(v)
+					state.OutlineEnabled = v
+					applyGeometry()
+				end,
+			})
+
+			col:SectionHeader("Animation")
+
+			col:Dropdown({
+				Name = "Style",
+				Items = { "None", "Spin", "Pulse" },
+				Default = state.Animation,
+				Callback = function(v)
+					state.Animation = v
+					if v == "None" then
+						container.Rotation = 0
+						container.Size = UDim2.fromOffset(100, 100)
+					end
+				end,
+			})
+		end
+
+		local ch = {}
+		function ch:Show() state.Enabled = true; surface.Visible = true end
+		function ch:Hide() state.Enabled = false; surface.Visible = false end
+		function ch:Configure(cfg)
+			for k, v in pairs(cfg) do state[k] = v end
+			applyGeometry(); applyColor()
+		end
+		function ch:Destroy()
+			animConn:Disconnect()
+			Veil.Instance:SecureDestroy(surface)
+		end
+		return ch
+	end
+
 	-- ── Character Viewer ─────────────────────────────────────────────────────
 
 	local CharViewerWidth = 180
