@@ -25,7 +25,19 @@ local settingsTab = Axis:CreateTab({
 	PinnedBottom = true,
 })
 
+local settingsLeft = settingsTab.Columns.leftColumn
 local settingsRight = settingsTab.Columns.rightColumn
+
+settingsLeft:SectionHeader("Utility")
+
+settingsLeft:CreateToggle({
+	Name = "Anti-AFK",
+	Subtext = "Prevents idle disconnect",
+	Default = false,
+	Callback = function(value)
+		Axis:SetAntiAFK(value)
+	end,
+})
 
 settingsRight:Dropdown({
 	Name = "Icon Pack",

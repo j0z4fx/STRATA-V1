@@ -835,12 +835,19 @@ return function(Toolkit, Veil)
 		return tab.leftColumn
 	end
 
+	local _columnOrders = {}
+	local function nextOrder(column)
+		local n = (_columnOrders[column] or 0) + 1
+		_columnOrders[column] = n
+		return n
+	end
+
 	local function createTextRow(parent, name, height)
 		return Veil.Instance:Create("Frame", {
 			Name = name,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			LayoutOrder = 999,
+			LayoutOrder = nextOrder(parent),
 			Size = UDim2.new(1, 0, 0, height),
 			Parent = parent,
 		})
@@ -2222,7 +2229,7 @@ return function(Toolkit, Veil)
 		local subtext = options.Subtext or options.Description or options.Desc
 		local hasSubtext = type(subtext) == "string" and subtext ~= ""
 		local holder = createTextRow(parentColumn, options.Name or "Label", hasSubtext and LabelRowWithSubtextHeight or LabelRowHeight)
-		holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+		if type(options.Order) == "number" then holder.LayoutOrder = options.Order end
 
 		local label = {
 			Type = "Label",
@@ -2304,7 +2311,7 @@ return function(Toolkit, Veil)
 		ensureColumnStack(parentColumn)
 
 		local holder = createTextRow(parentColumn, options.Name or "Divider", 8)
-		holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+		if type(options.Order) == "number" then holder.LayoutOrder = options.Order end
 
 		local line = Veil.Instance:Create("Frame", {
 			Name = "Line",
@@ -2343,7 +2350,7 @@ return function(Toolkit, Veil)
 		local leadTop = SectionSpacing - ElementSpacing
 		local leadBottom = HeaderSpacing - ElementSpacing
 		local holder = createTextRow(parentColumn, options.Name or "SectionHeader", leadTop + 18 + leadBottom)
-		holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+		if type(options.Order) == "number" then holder.LayoutOrder = options.Order end
 
 		local text = options.Text or options.Name or "Section"
 		local textWidth = math.ceil(measureText(text, 12, Enum.Font.GothamMedium).X)
@@ -3375,7 +3382,7 @@ return function(Toolkit, Veil)
 			Name = toggle.Name,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			LayoutOrder = #tab.ToggleControls + 1,
+			LayoutOrder = nextOrder(parentColumn),
 			Size = UDim2.new(1, 0, 0, rowHeight),
 			Visible = toggle.Visible,
 			Parent = parentColumn,
@@ -3874,7 +3881,7 @@ return function(Toolkit, Veil)
 			Name = dropdown.Name,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			LayoutOrder = type(options.Order) == "number" and options.Order or 999,
+			LayoutOrder = type(options.Order) == "number" and options.Order or nextOrder(parentColumn),
 			Size = UDim2.new(1, 0, 0, DropdownRowHeight),
 			Visible = dropdown.Visible,
 			Parent = parentColumn,
@@ -4368,7 +4375,7 @@ return function(Toolkit, Veil)
 			Name = input.Name,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			LayoutOrder = type(options.Order) == "number" and options.Order or 999,
+			LayoutOrder = type(options.Order) == "number" and options.Order or nextOrder(parentColumn),
 			Size = UDim2.new(1, 0, 0, InputRowHeight),
 			Visible = input.Visible,
 			Parent = parentColumn,
@@ -4563,7 +4570,7 @@ return function(Toolkit, Veil)
 			Name = btn.Name,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			LayoutOrder = type(options.Order) == "number" and options.Order or 999,
+			LayoutOrder = type(options.Order) == "number" and options.Order or nextOrder(parentColumn),
 			Size = UDim2.new(1, 0, 0, ButtonRowHeight),
 			Visible = btn.Visible,
 			Parent = parentColumn,
@@ -4708,7 +4715,7 @@ return function(Toolkit, Veil)
 		end
 
 		slider.Holder = createTextRow(parentColumn, slider.Name, rowHeight)
-		slider.Holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+		if type(options.Order) == "number" then slider.Holder.LayoutOrder = options.Order end
 
 		slider.TitleLabel, slider.ValueLabel, slider.SubtextLabel =
 			buildSliderTextRows(slider.Holder, slider.Name, subtext, hasSubtext)
@@ -4913,7 +4920,7 @@ return function(Toolkit, Veil)
 		end
 
 		slider.Holder = createTextRow(parentColumn, slider.Name, rowHeight)
-		slider.Holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+		if type(options.Order) == "number" then slider.Holder.LayoutOrder = options.Order end
 
 		slider.TitleLabel, slider.ValueLabel, slider.SubtextLabel =
 			buildSliderTextRows(slider.Holder, slider.Name, subtext, hasSubtext)
@@ -5147,7 +5154,7 @@ return function(Toolkit, Veil)
 		end
 
 		slider.Holder = createTextRow(parentColumn, slider.Name, rowHeight)
-		slider.Holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
+		if type(options.Order) == "number" then slider.Holder.LayoutOrder = options.Order end
 
 		slider.TitleLabel, slider.ValueLabel, slider.SubtextLabel =
 			buildSliderTextRows(slider.Holder, slider.Name, subtext, hasSubtext)
@@ -5935,6 +5942,28 @@ return function(Toolkit, Veil)
 		self.ActiveOverlays = nil
 		self._overlayOrder = nil
 		self.ActivePickerPopup = nil
+
+		self:SetAntiAFK(false)
+	end
+
+	function Axis:SetAntiAFK(enabled)
+		if enabled then
+			if self._antiAFKConn then return end
+			local ok, vuser = pcall(function() return Veil.Services:Get("VirtualUser") end)
+			if not ok or not vuser then return end
+			local players = Veil.Services:Get("Players")
+			local player = players and players.LocalPlayer
+			if not player then return end
+			self._antiAFKConn = player.Idled:Connect(function()
+				vuser:CaptureController()
+				vuser:ClickButton2(Vector2.new())
+			end)
+		else
+			if self._antiAFKConn then
+				self._antiAFKConn:Disconnect()
+				self._antiAFKConn = nil
+			end
+		end
 	end
 
 	function Axis:GetTheme()
