@@ -364,6 +364,21 @@ local steps = {
 				Default = "Option 1",
 			})
 
+			right:SectionHeader("Inputs")
+
+			right:Input({
+				Name = "Example Input",
+				Placeholder = "Type here...",
+			})
+
+			right:Input({
+				Name = "Example Input",
+				Default = "With Default",
+				Validator = function(value)
+					return #tostring(value) <= 24
+				end,
+			})
+
 			right:SectionHeader("Pickers")
 
 			local labelWithKeypicker = right:Label({
@@ -389,6 +404,31 @@ local steps = {
 
 			toggleWithSubtext:AddColorpicker({
 				Default = Color3.fromRGB(90, 171, 255),
+			})
+
+			right:SectionHeader("Actions")
+
+			right:Button({
+				Name = "Example Button",
+				Callback = function()
+					context.Axis:Toast({
+						Title = "Example Toast",
+						Message = "Button interaction complete",
+						Location = "BottomCenter",
+					})
+				end,
+			})
+
+			right:Button({
+				Name = "Example Button",
+				Style = "secondary",
+				Callback = function()
+					context.Axis:Notify({
+						Title = "Example Notification",
+						Message = "Secondary action triggered",
+						Location = "TopRight",
+					})
+				end,
 			})
 
 			context.Axis:CreateTab({
