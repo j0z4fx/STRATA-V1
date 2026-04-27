@@ -1117,6 +1117,169 @@ function Sound:Cleanup()
 	Util.ClearTable(self._cache)
 end
 
+local Storage = {}
+Storage.__index = Storage
+
+local function trimPath(path)
+	path = tostring(path or "")
+	path = string.gsub(path, "\\", "/")
+	path = string.gsub(path, "/+", "/")
+	path = string.gsub(path, "^/+", "")
+	path = string.gsub(path, "/+$", "")
+	return path
+end
+
+local function getPathStem(path)
+	local normalized = trimPath(path)
+	local fileName = string.match(normalized, "([^/]+)$") or normalized
+	return (string.gsub(fileName, "%.[^%.]+$", ""))
+end
+
+function Storage.new(rootFolder)
+	local self = setmetatable({}, Storage)
+	self.RootFolder = trimPath(rootFolder ~= nil and rootFolder or "StrataData")
+	self._json = HttpService
+	self._supportsFiles = type(readfile) == "function"
+		and type(writefile) == "function"
+		and type(isfile) == "function"
+	self._supportsFolders = type(isfolder) == "function"
+		and type(makefolder) == "function"
+	self._supportsLists = type(listfiles) == "function"
+	self:EnsureFolder("")
+	return self
+end
+
+function Storage:_join(subpath)
+	local child = trimPath(subpath)
+	if child == "" then
+		return self.RootFolder
+	end
+	if self.RootFolder == "" then
+		return child
+	end
+	return self.RootFolder .. "/" .. child
+end
+
+function Storage:EnsureFolder(subpath)
+	if not self._supportsFolders then
+		return false
+	end
+
+	local target = self:_join(subpath)
+	local current = ""
+	for part in string.gmatch(target, "[^/]+") do
+		current = current == "" and part or (current .. "/" .. part)
+		local ok, exists = pcall(isfolder, current)
+		if not ok or not exists then
+			pcall(makefolder, current)
+		end
+	end
+
+	return true
+end
+
+function Storage:Exists(path)
+	if not self._supportsFiles then
+		return false
+	end
+
+	local ok, exists = pcall(isfile, self:_join(path))
+	return ok and exists == true
+end
+
+function Storage:ReadString(path, defaultValue)
+	if not self._supportsFiles then
+		return defaultValue
+	end
+
+	local fullPath = self:_join(path)
+	local ok, content = pcall(readfile, fullPath)
+	if ok and type(content) == "string" then
+		return content
+	end
+
+	return defaultValue
+end
+
+function Storage:WriteString(path, content)
+	if not self._supportsFiles then
+		return false
+	end
+
+	local normalized = trimPath(path)
+	local folder = string.match(normalized, "^(.*)/[^/]+$")
+	if folder and folder ~= "" then
+		self:EnsureFolder(folder)
+	end
+
+	local ok = pcall(writefile, self:_join(normalized), tostring(content or ""))
+	return ok
+end
+
+function Storage:ReadJson(path, defaultValue)
+	local content = self:ReadString(path, nil)
+	if type(content) ~= "string" then
+		return defaultValue
+	end
+
+	local ok, decoded = pcall(self._json.JSONDecode, self._json, content)
+	if ok then
+		return decoded
+	end
+
+	return defaultValue
+end
+
+function Storage:WriteJson(path, payload)
+	local ok, encoded = pcall(self._json.JSONEncode, self._json, payload)
+	if not ok then
+		return false
+	end
+
+	return self:WriteString(path, encoded)
+end
+
+function Storage:Delete(path)
+	if type(delfile) ~= "function" then
+		return false
+	end
+
+	local fullPath = self:_join(path)
+	local ok, exists = pcall(isfile, fullPath)
+	if not ok or not exists then
+		return false
+	end
+
+	return pcall(delfile, fullPath)
+end
+
+function Storage:List(subpath, extension)
+	if not self._supportsLists then
+		return {}
+	end
+
+	local folder = self:_join(subpath)
+	local ok, files = pcall(listfiles, folder)
+	if not ok or type(files) ~= "table" then
+		return {}
+	end
+
+	local list = {}
+	local wantedExtension = type(extension) == "string" and extension or nil
+
+	for _, path in ipairs(files) do
+		if type(path) == "string" then
+			local normalized = trimPath(path)
+			if not wantedExtension or string.sub(normalized, -#wantedExtension) == wantedExtension then
+				table.insert(list, getPathStem(normalized))
+			end
+		end
+	end
+
+	table.sort(list)
+	return list
+end
+
 local Toolkit = {
 	Util = Util,
 	Signal = Signal,
@@ -1127,6 +1290,7 @@ local Toolkit = {
 		Tasks = Tasks,
 		State = State,
 		Sound = Sound,
+		Storage = Storage,
 	},
 }
 
@@ -1137,6 +1301,7 @@ Toolkit.Tasks = Tasks.new()
 Toolkit.State = State.new()
 Toolkit.Drag = Drag.new(Toolkit.Services)
 Toolkit.Sound = Sound.new(Toolkit.Services, Toolkit.Instance)
+Toolkit.Storage = Storage.new("Strata")
 
 function Toolkit:Cleanup()
 	self.Connections:Cleanup()

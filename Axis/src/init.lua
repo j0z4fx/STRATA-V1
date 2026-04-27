@@ -14,6 +14,7 @@ return function(Toolkit, Veil)
 	local RunService = Veil.Services:Get("RunService")
 	local TweenService = Veil.Services:Get("TweenService")
 	local UserInputService = Veil.Services:Get("UserInputService")
+	local Lighting = Veil.Services:Get("Lighting")
 	local AccentTransparency = 0.9
 	local InactiveIconColor = Color3.fromRGB(68, 68, 78)
 	local SidebarInset = 6
@@ -112,9 +113,12 @@ return function(Toolkit, Veil)
 	local InputFieldWidth = 110
 	local InputFocusStrokeTransparency = 0.72
 	local InputAnimTime = 0.12
-	local ButtonRowHeight = 30
+	local ButtonRowHeight = 40
 	local ButtonCornerRadius = 8
 	local ButtonAnimTime = 0.10
+	local ButtonInnerInsetY = 2
+	local ColumnScrollBarThickness = 4
+	local BackgroundBlurSize = 18
 	local COLORS = {
 		Window = Color3.fromRGB(19, 19, 22),
 		Titlebar = Color3.fromRGB(24, 24, 27),
@@ -126,7 +130,56 @@ return function(Toolkit, Veil)
 		ToggleOffDot = Color3.fromRGB(68, 68, 78),
 		ToggleOnDot = Color3.fromRGB(255, 255, 255),
 	}
+	local THEME_KEYS = {
+		"Window",
+		"Titlebar",
+		"Sidebar",
+		"Stroke",
+		"Text",
+		"Accent",
+		"ToggleOffBackground",
+		"ToggleOffDot",
+		"ToggleOnDot",
+	}
 	local IconTabRegistry: { any } = {}
+
+	local function colorToHex(color)
+		if typeof(color) ~= "Color3" then
+			return "#000000"
+		end
+
+		return string.format("#%02X%02X%02X", math.round(color.R * 255), math.round(color.G * 255), math.round(color.B * 255))
+	end
+
+	local function colorFromValue(value, fallback)
+		if typeof(value) == "Color3" then
+			return value
+		end
+
+		if type(value) == "string" then
+			local hex = value:gsub("#", "")
+			if #hex == 6 then
+				local r = tonumber(hex:sub(1, 2), 16)
+				local g = tonumber(hex:sub(3, 4), 16)
+				local b = tonumber(hex:sub(5, 6), 16)
+				if r and g and b then
+					return Color3.fromRGB(r, g, b)
+				end
+			end
+		elseif type(value) == "table" then
+			local r = value.R or value.r or value[1]
+			local g = value.G or value.g or value[2]
+			local b = value.B or value.b or value[3]
+			if type(r) == "number" and type(g) == "number" and type(b) == "number" then
+				if r <= 1 and g <= 1 and b <= 1 then
+					return Color3.new(r, g, b)
+				end
+				return Color3.fromRGB(r, g, b)
+			end
+		end
+
+		return fallback
+	end
 
 	local function normalizeIconAssetData(raw: any): { Image: string, ImageRectSize: Vector2, ImageRectOffset: Vector2 }?
 		if type(raw) ~= "table" then
@@ -518,6 +571,7 @@ return function(Toolkit, Veil)
 
 	local function createStrokeLine(parent, size, position)
 		return Veil.Instance:Create("Frame", {
+			Name = "AxisStrokeLine",
 			BackgroundColor3 = COLORS.Stroke,
 			BackgroundTransparency = STROKE_TRANSPARENCY,
 			BorderSizePixel = 0,
@@ -931,6 +985,40 @@ return function(Toolkit, Veil)
 		return width
 	end
 
+	local function assignPersistKey(tab, control, options, controlType)
+		local key = options and (options.PersistKey or options.Id or options.Key)
+		if type(key) == "string" and key ~= "" then
+			control.PersistKey = key
+			return key
+		end
+
+		tab._persistCounter = (tab._persistCounter or 0) + 1
+		key = string.format("%s.%s.%d", tab.Name, controlType or control.Type or "Control", tab._persistCounter)
+		control.PersistKey = key
+		return key
+	end
+
+	local function registerPersistedControl(tab, control)
+		tab.PersistControls = tab.PersistControls or {}
+		table.insert(tab.PersistControls, control)
+	end
+
+	local function registerTabControl(tab, control)
+		tab.Controls = tab.Controls or {}
+		table.insert(tab.Controls, control)
+		return control
+	end
+
+	local function assignAccessoryPersistKey(control, accessory, suffix)
+		local base = control.PersistKey
+		if type(base) ~= "string" or base == "" then
+			base = assignPersistKey(control.Tab, control, { PersistKey = control.Name }, control.Type)
+		end
+
+		accessory.PersistKey = string.format("%s.%s", base, suffix)
+		return accessory.PersistKey
+	end
+
 	local function normalizeKeyValue(key)
 		if typeof(key) == "EnumItem" then
 			if key.EnumType == Enum.KeyCode then
@@ -1079,29 +1167,56 @@ return function(Toolkit, Veil)
 	local function createColumns(self, tab, parent, columnMode)
 		local columns = {}
 
-		local leftColumn = Veil.Instance:Create("Frame", {
+		local leftColumn = Veil.Instance:Create("ScrollingFrame", {
 			Name = "leftColumn",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
+			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			BottomImage = "",
+			CanvasSize = UDim2.fromOffset(0, 0),
+			MidImage = "",
+			ScrollBarImageColor3 = COLORS.Accent,
+			ScrollBarImageTransparency = 0.78,
+			ScrollBarThickness = ColumnScrollBarThickness,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+			TopImage = "",
 			Parent = parent,
 		})
 		table.insert(columns, leftColumn)
 
 		local middleColumn
 		if columnMode == "Triple" then
-			middleColumn = Veil.Instance:Create("Frame", {
+			middleColumn = Veil.Instance:Create("ScrollingFrame", {
 				Name = "middleColumn",
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
+				AutomaticCanvasSize = Enum.AutomaticSize.Y,
+				BottomImage = "",
+				CanvasSize = UDim2.fromOffset(0, 0),
+				MidImage = "",
+				ScrollBarImageColor3 = COLORS.Accent,
+				ScrollBarImageTransparency = 0.78,
+				ScrollBarThickness = ColumnScrollBarThickness,
+				ScrollingDirection = Enum.ScrollingDirection.Y,
+				TopImage = "",
 				Parent = parent,
 			})
 			table.insert(columns, middleColumn)
 		end
 
-		local rightColumn = Veil.Instance:Create("Frame", {
+		local rightColumn = Veil.Instance:Create("ScrollingFrame", {
 			Name = "rightColumn",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
+			AutomaticCanvasSize = Enum.AutomaticSize.Y,
+			BottomImage = "",
+			CanvasSize = UDim2.fromOffset(0, 0),
+			MidImage = "",
+			ScrollBarImageColor3 = COLORS.Accent,
+			ScrollBarImageTransparency = 0.78,
+			ScrollBarThickness = ColumnScrollBarThickness,
+			ScrollingDirection = Enum.ScrollingDirection.Y,
+			TopImage = "",
 			Parent = parent,
 		})
 		table.insert(columns, rightColumn)
@@ -1368,6 +1483,8 @@ return function(Toolkit, Veil)
 		self.SelectedTab = nil
 		self.CleanupConnections = {}
 		self.CursorVisible = true
+		self.Visible = true
+		self.BackgroundBlurEnabled = false
 		self.TooltipToken = 0
 		self.ActiveTooltipAnchor = nil
 		self.ActiveTooltipText = nil
@@ -1555,6 +1672,28 @@ return function(Toolkit, Veil)
 			Parent = self.Surface,
 		})
 
+		self.SelectionHighlight = Veil.Instance:Create("Frame", {
+			Name = "SelectionHighlight",
+			Active = false,
+			BackgroundColor3 = COLORS.Accent,
+			BackgroundTransparency = 0.28,
+			BorderSizePixel = 0,
+			Interactable = false,
+			Position = UDim2.fromOffset(-2048, -2048),
+			Size = UDim2.fromOffset(12, 12),
+			Visible = true,
+			ZIndex = 520,
+			Parent = self.Surface,
+		})
+		createCorner(self.SelectionHighlight, 4)
+
+		self.BlurEffect = Veil.Instance:Create("BlurEffect", {
+			Name = "AxisWindowBlur",
+			Enabled = false,
+			Size = BackgroundBlurSize,
+			Parent = Lighting,
+		})
+
 		local cursorParts = {
 			{ Name = "VerticalStroke", Size = UDim2.fromOffset(3, 13), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 500 },
 			{ Name = "HorizontalStroke", Size = UDim2.fromOffset(13, 3), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 500 },
@@ -1585,10 +1724,10 @@ return function(Toolkit, Veil)
 
 			if self.Cursor then
 				self.Cursor.Position = UDim2.fromOffset(mouseLocation.X, mouseLocation.Y)
-				self.Cursor.Visible = self.CursorVisible
+				self.Cursor.Visible = self.Visible and self.CursorVisible
 			end
 
-			if self.Tooltip and self.Tooltip.Visible and self.ActiveTooltipAnchor then
+			if self.Tooltip and self.Tooltip.Visible and self.ActiveTooltipAnchor and self.Visible then
 				local viewportSize = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920, 1080)
 				local tooltipWidth = self.Tooltip.AbsoluteSize.X
 				local tooltipHeight = self.Tooltip.AbsoluteSize.Y
@@ -1659,6 +1798,16 @@ return function(Toolkit, Veil)
 			self.TooltipLabel = nil
 		end
 
+		if self.SelectionHighlight then
+			Veil.Instance:SecureDestroy(self.SelectionHighlight)
+			self.SelectionHighlight = nil
+		end
+
+		if self.BlurEffect then
+			Veil.Instance:SecureDestroy(self.BlurEffect)
+			self.BlurEffect = nil
+		end
+
 		for _, tab in ipairs(self.Tabs) do
 			if tab.ToggleControls then
 				for _, toggle in ipairs(tab.ToggleControls) do
@@ -1690,6 +1839,16 @@ return function(Toolkit, Veil)
 		end
 
 		UserInputService.MouseIconEnabled = true
+	end
+
+	function Window:_applySelectionHighlight(textBox)
+		if not textBox or not self.SelectionHighlight then
+			return
+		end
+
+		pcall(function()
+			textBox.SelectionImageObject = self.SelectionHighlight
+		end)
 	end
 
 	function Window:_ensureTooltip()
@@ -1801,6 +1960,40 @@ return function(Toolkit, Veil)
 		}):Play()
 	end
 
+	function Window:SetVisible(visible)
+		self.Visible = visible ~= false
+
+		if self.Frame then
+			self.Frame.Visible = self.Visible
+		end
+
+		if not self.Visible then
+			self:HideTooltip()
+			Axis:_closeActivePicker()
+		end
+
+		if self.BlurEffect then
+			self.BlurEffect.Enabled = self.Visible and self.BackgroundBlurEnabled
+		end
+
+		self.CursorVisible = self.Visible
+		UserInputService.MouseIconEnabled = not self.Visible
+		return self.Visible
+	end
+
+	function Window:ToggleVisible()
+		return self:SetVisible(not self.Visible)
+	end
+
+	function Window:SetBackgroundBlurEnabled(enabled)
+		self.BackgroundBlurEnabled = enabled == true
+		if self.BlurEffect then
+			self.BlurEffect.Enabled = self.Visible and self.BackgroundBlurEnabled
+			self.BlurEffect.Size = self.BackgroundBlurEnabled and BackgroundBlurSize or 0
+		end
+		return self.BackgroundBlurEnabled
+	end
+
 	function Window:SelectTab(tab)
 		if not tab or self.SelectedTab == tab then
 			return tab
@@ -1831,6 +2024,8 @@ return function(Toolkit, Veil)
 			IconScale = type(options.IconScale) == "number" and options.IconScale or 1,
 			PinnedBottom = options.PinnedBottom == true or options.Dock == "Bottom",
 			Window = self,
+			Controls = {},
+			PersistControls = {},
 			ToggleControls = {},
 			AccessoryControls = {},
 		}
@@ -1890,7 +2085,8 @@ return function(Toolkit, Veil)
 			Parent = self.TabContentHost,
 		})
 
-		tab.leftColumn, tab.middleColumn, tab.rightColumn = createColumns(self, tab, tab.Content, tab.IsSettings and "Double" or "Triple")
+		local columnMode = options.ColumnMode or (tab.IsSettings and "Triple" or "Triple")
+		tab.leftColumn, tab.middleColumn, tab.rightColumn = createColumns(self, tab, tab.Content, columnMode)
 
 		local function makeColumnApi(frame)
 			return {
@@ -2039,6 +2235,7 @@ return function(Toolkit, Veil)
 			RowHeight = hasSubtext and LabelRowWithSubtextHeight or LabelRowHeight,
 			AccessoryWidth = 0,
 		}
+		assignPersistKey(tab, label, options, "Label")
 
 		label.TitleLabel = Veil.Instance:Create("TextLabel", {
 			Name = "Title",
@@ -2089,6 +2286,14 @@ return function(Toolkit, Veil)
 			self.Holder.Visible = visible ~= false
 		end
 
+		function label:RefreshTheme()
+			self.TitleLabel.TextColor3 = COLORS.Text
+			if self.SubtextLabel then
+				self.SubtextLabel.TextColor3 = COLORS.Text
+			end
+		end
+
+		registerTabControl(tab, label)
 		return label
 	end
 
@@ -2113,13 +2318,20 @@ return function(Toolkit, Veil)
 			Parent = holder,
 		})
 
-		return {
+		local divider = {
 			Type = "Divider",
 			Holder = holder,
 			Line = line,
 			Tab = tab,
 			Window = self,
 		}
+
+		function divider:RefreshTheme()
+			self.Line.BackgroundColor3 = COLORS.Stroke
+		end
+
+		registerTabControl(tab, divider)
+		return divider
 	end
 
 	function Window:_createSectionHeader(tab, options)
@@ -2181,7 +2393,7 @@ return function(Toolkit, Veil)
 			Parent = holder,
 		})
 
-		return {
+		local header = {
 			Type = "SectionHeader",
 			Holder = holder,
 			Label = centerLabel,
@@ -2190,6 +2402,15 @@ return function(Toolkit, Veil)
 			Tab = tab,
 			Window = self,
 		}
+
+		function header:RefreshTheme()
+			self.Label.TextColor3 = COLORS.Text
+			self.LeftLine.BackgroundColor3 = COLORS.Stroke
+			self.RightLine.BackgroundColor3 = COLORS.Stroke
+		end
+
+		registerTabControl(tab, header)
+		return header
 	end
 
 	function Window:_positionPickerPopup(anchorButton, popup)
@@ -2250,6 +2471,7 @@ return function(Toolkit, Veil)
 
 	function Window:_createKeypicker(control, options)
 		options = options or {}
+		local shouldPersist = options.Persist ~= false
 
 		local host = ensureAccessoryHost(control)
 		local initialKey = normalizeKeyValue(options.Default or options.Key or "None")
@@ -2284,6 +2506,9 @@ return function(Toolkit, Veil)
 			Toggled = false,
 			Capturing = false,
 		}
+		if shouldPersist then
+			assignAccessoryPersistKey(control, keypicker, "Keypicker")
+		end
 
 		local displayText = keypicker.Value
 		local buttonWidth = math.max(KeypickerMinWidth, math.ceil(measureText(displayText, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding)
@@ -2383,6 +2608,12 @@ return function(Toolkit, Veil)
 			self.ButtonLabel.TextColor3 = self.Capturing and COLORS.Accent or (active and Color3.fromRGB(255, 255, 255) or COLORS.Text)
 			self:_refreshModeButtons()
 			refreshAccessoryWidth(control)
+		end
+
+		function keypicker:RefreshTheme()
+			self.Button.BackgroundColor3 = self:GetState() and COLORS.Accent or COLORS.ToggleOffBackground
+			self.ButtonLabel.TextColor3 = self.Capturing and COLORS.Accent or (self:GetState() and Color3.fromRGB(255, 255, 255) or COLORS.Text)
+			self:_refreshModeButtons()
 		end
 
 		function keypicker:CloseModeMenu()
@@ -2648,6 +2879,7 @@ return function(Toolkit, Veil)
 
 	function Window:_createColorpicker(control, options)
 		options = options or {}
+		local shouldPersist = options.Persist ~= false
 
 		local host = ensureAccessoryHost(control)
 		local initialColor = typeof(options.Default) == "Color3" and options.Default or COLORS.Accent
@@ -2661,6 +2893,9 @@ return function(Toolkit, Veil)
 			Callback = options.Callback or options.ChangedCallback,
 			ChangedSignal = Toolkit.Signal.new(),
 		}
+		if shouldPersist then
+			assignAccessoryPersistKey(control, colorpicker, "Colorpicker")
+		end
 
 		local hue, sat, val = initialColor:ToHSV()
 		colorpicker.Hue = hue
@@ -2880,6 +3115,17 @@ return function(Toolkit, Veil)
 			self.Button.BackgroundTransparency = self.Disabled and 0.2 or 0
 		end
 
+		function colorpicker:RefreshTheme()
+			self.Button.BackgroundColor3 = COLORS.ToggleOffBackground
+			self.Popup.BackgroundColor3 = COLORS.Window
+			self.PopupPreviewLabel.TextColor3 = COLORS.Text
+			self.MapCursorOuter.BackgroundColor3 = COLORS.Window
+			self.MapCursorInner.BackgroundColor3 = COLORS.Text
+			self.HueCursor.BackgroundColor3 = COLORS.Text
+			self.FooterLabel.TextColor3 = COLORS.Text
+			self:_refreshVisuals()
+		end
+
 		function colorpicker:SetDisabled(disabled)
 			self.Disabled = disabled == true
 			self.Button.Active = not self.Disabled
@@ -3089,6 +3335,7 @@ return function(Toolkit, Veil)
 
 	function Window:_createToggle(tab, options)
 		options = options or {}
+		local shouldPersist = options.Persist ~= false
 
 		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
 		ensureColumnStack(parentColumn)
@@ -3120,6 +3367,9 @@ return function(Toolkit, Veil)
 			RowHeight = rowHeight,
 			AccessoryWidth = 0,
 		}
+		if shouldPersist then
+			assignPersistKey(tab, toggle, options, "Toggle")
+		end
 
 		toggle.Holder = Veil.Instance:Create("Frame", {
 			Name = toggle.Name,
@@ -3332,6 +3582,17 @@ return function(Toolkit, Veil)
 			return connection
 		end
 
+		function toggle:RefreshTheme()
+			self.TitleLabel.TextColor3 = COLORS.Text
+			if self.SubtextLabel then
+				self.SubtextLabel.TextColor3 = COLORS.Text
+			end
+			self.SwitchStroke.Color = COLORS.Stroke
+			self:_applyVisualState(self.Value, {
+				Instant = true,
+			})
+		end
+
 		function toggle:AddKeypicker(keypickerOptions)
 			return self.Window:_createKeypicker(self, keypickerOptions)
 		end
@@ -3405,6 +3666,10 @@ return function(Toolkit, Veil)
 		})
 
 		table.insert(tab.ToggleControls, toggle)
+		if shouldPersist then
+			registerPersistedControl(tab, toggle)
+		end
+		registerTabControl(tab, toggle)
 		return toggle
 	end
 
@@ -3543,6 +3808,7 @@ return function(Toolkit, Veil)
 
 	function Window:_createDropdown(tab, options)
 		options = options or {}
+		local shouldPersist = options.Persist ~= false
 
 		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
 		ensureColumnStack(parentColumn)
@@ -3583,6 +3849,9 @@ return function(Toolkit, Veil)
 			Tab = tab,
 			Window = self,
 		}
+		if shouldPersist then
+			assignPersistKey(tab, dropdown, options, "Dropdown")
+		end
 
 		local function computeBadgeText()
 			if dropdown.MultiSelect then
@@ -3739,6 +4008,7 @@ return function(Toolkit, Veil)
 				ZIndex = 246,
 				Parent = searchBarFrame,
 			})
+			self:_applySelectionHighlight(dropdown.SearchBox)
 			dropdown.SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
 				dropdown._searchQuery = dropdown.SearchBox.Text
 				buildItems()
@@ -3985,6 +4255,46 @@ return function(Toolkit, Veil)
 			return self.ChangedSignal:Connect(callback)
 		end
 
+		function dropdown:SetDisabled(disabled)
+			self.Disabled = disabled == true
+			self.Button.Active = not self.Disabled
+			self.TitleLabel.TextTransparency = self.Disabled and 0.5 or 0
+			self.ValueBadge.BackgroundTransparency = self.Disabled and 0.25 or 0
+			self.ValueLabel.TextTransparency = self.Disabled and 0.45 or 0.12
+			if self.SearchBox then
+				self.SearchBox.TextEditable = not self.Disabled
+			end
+			if self.Disabled then
+				self:Close()
+			end
+		end
+
+		function dropdown:SetVisible(visible)
+			self.Visible = visible ~= false
+			self.Holder.Visible = self.Visible
+			if not self.Visible then
+				self:Close()
+			end
+		end
+
+		function dropdown:RefreshTheme()
+			self.TitleLabel.TextColor3 = COLORS.Text
+			self.ValueBadge.BackgroundColor3 = COLORS.ToggleOffBackground
+			self.ValueLabel.TextColor3 = COLORS.Text
+			self.Panel.BackgroundColor3 = COLORS.Window
+			if self.PanelBorder then
+				self.PanelBorder.Color = COLORS.Stroke
+			end
+			if self.SearchBox then
+				self.SearchBox.TextColor3 = COLORS.Text
+				self.SearchBox.PlaceholderColor3 = COLORS.Text
+				local searchBar = self.SearchBox.Parent
+				searchBar.BackgroundColor3 = COLORS.ToggleOffBackground
+			end
+			buildItems()
+			self:SetDisabled(self.Disabled)
+		end
+
 		function dropdown:SetItems(newItems)
 			self.Items = newItems or {}
 			self.Values = {}
@@ -4019,6 +4329,11 @@ return function(Toolkit, Veil)
 			end
 		end))
 
+		dropdown:SetDisabled(dropdown.Disabled)
+		if shouldPersist then
+			registerPersistedControl(tab, dropdown)
+		end
+		registerTabControl(tab, dropdown)
 		return dropdown
 	end
 
@@ -4026,6 +4341,7 @@ return function(Toolkit, Veil)
 
 	function Window:_createInput(tab, options)
 		options = options or {}
+		local shouldPersist = options.Persist ~= false
 
 		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
 		ensureColumnStack(parentColumn)
@@ -4044,6 +4360,9 @@ return function(Toolkit, Veil)
 			Tab = tab,
 			Window = self,
 		}
+		if shouldPersist then
+			assignPersistKey(tab, input, options, "Input")
+		end
 
 		input.Holder = Veil.Instance:Create("Frame", {
 			Name = input.Name,
@@ -4122,6 +4441,7 @@ return function(Toolkit, Veil)
 			ZIndex = 6,
 			Parent = input.FieldFrame,
 		})
+		self:_applySelectionHighlight(input.TextBox)
 
 		-- Focus state: brighten stroke
 		local focusTI = TweenInfo.new(InputAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -4196,7 +4516,25 @@ return function(Toolkit, Veil)
 			self.FieldFrame.BackgroundTransparency = self.Disabled and 0.4 or 0
 		end
 
+		function input:SetVisible(visible)
+			self.Visible = visible ~= false
+			self.Holder.Visible = self.Visible
+		end
+
+		function input:RefreshTheme()
+			self.TitleLabel.TextColor3 = COLORS.Text
+			self.FieldFrame.BackgroundColor3 = COLORS.ToggleOffBackground
+			self.TextBox.TextColor3 = COLORS.Text
+			self.TextBox.PlaceholderColor3 = COLORS.Text
+			self.FieldStroke.Color = COLORS.Stroke
+			self:SetDisabled(self.Disabled)
+		end
+
 		input:SetDisabled(input.Disabled)
+		if shouldPersist then
+			registerPersistedControl(tab, input)
+		end
+		registerTabControl(tab, input)
 		return input
 	end
 
@@ -4243,7 +4581,8 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = bgTransp,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamBold,
-			Size = UDim2.fromScale(1, 1),
+			Position = UDim2.fromOffset(0, ButtonInnerInsetY),
+			Size = UDim2.new(1, 0, 1, -(ButtonInnerInsetY * 2)),
 			Text = btn.Name,
 			TextColor3 = textColor,
 			TextSize = 13,
@@ -4314,7 +4653,16 @@ return function(Toolkit, Veil)
 			self.Holder.Visible = self.Visible
 		end
 
+		function btn:RefreshTheme()
+			local primary = self.Style == "primary"
+			self.Inner.BackgroundColor3 = primary and COLORS.Accent or COLORS.ToggleOffBackground
+			self.Inner.TextColor3 = primary and COLORS.Window or COLORS.Text
+			self.Stroke.Color = primary and COLORS.Accent or COLORS.Stroke
+			self:SetDisabled(self.Disabled)
+		end
+
 		btn:SetDisabled(btn.Disabled)
+		registerTabControl(tab, btn)
 		return btn
 	end
 
@@ -4322,6 +4670,7 @@ return function(Toolkit, Veil)
 
 	function Window:_createSlider(tab, options)
 		options = options or {}
+		local shouldPersist = options.Persist ~= false
 
 		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
 		ensureColumnStack(parentColumn)
@@ -4354,6 +4703,9 @@ return function(Toolkit, Veil)
 			Tab = tab,
 			Window = self,
 		}
+		if shouldPersist then
+			assignPersistKey(tab, slider, options, "Slider")
+		end
 
 		slider.Holder = createTextRow(parentColumn, slider.Name, rowHeight)
 		slider.Holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
@@ -4436,6 +4788,18 @@ return function(Toolkit, Veil)
 			return conn
 		end
 
+		function slider:RefreshTheme()
+			self.TitleLabel.TextColor3 = COLORS.Text
+			if self.SubtextLabel then
+				self.SubtextLabel.TextColor3 = COLORS.Text
+			end
+			self.ValueLabel.TextColor3 = COLORS.Text
+			self.TrackBg.BackgroundColor3 = COLORS.ToggleOffBackground
+			self.TrackFill.BackgroundColor3 = COLORS.Accent
+			self.Thumb.BackgroundColor3 = COLORS.Accent
+			self:_refreshTrack()
+		end
+
 		local dragging = false
 
 		slider.Hitbox.MouseEnter:Connect(function()
@@ -4500,6 +4864,10 @@ return function(Toolkit, Veil)
 			slider:_refreshTrack()
 		end)
 
+		if shouldPersist then
+			registerPersistedControl(tab, slider)
+		end
+		registerTabControl(tab, slider)
 		return slider
 	end
 
@@ -4507,6 +4875,7 @@ return function(Toolkit, Veil)
 
 	function Window:_createNotchedSlider(tab, options)
 		options = options or {}
+		local shouldPersist = options.Persist ~= false
 
 		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
 		ensureColumnStack(parentColumn)
@@ -4539,6 +4908,9 @@ return function(Toolkit, Veil)
 			Tab = tab,
 			Window = self,
 		}
+		if shouldPersist then
+			assignPersistKey(tab, slider, options, "NotchedSlider")
+		end
 
 		slider.Holder = createTextRow(parentColumn, slider.Name, rowHeight)
 		slider.Holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
@@ -4647,6 +5019,18 @@ return function(Toolkit, Veil)
 			return conn
 		end
 
+		function slider:RefreshTheme()
+			self.TitleLabel.TextColor3 = COLORS.Text
+			if self.SubtextLabel then
+				self.SubtextLabel.TextColor3 = COLORS.Text
+			end
+			self.ValueLabel.TextColor3 = COLORS.Text
+			self.TrackBg.BackgroundColor3 = COLORS.ToggleOffBackground
+			self.TrackFill.BackgroundColor3 = COLORS.Accent
+			self.Thumb.BackgroundColor3 = COLORS.Accent
+			self:_refreshTrack()
+		end
+
 		local dragging = false
 
 		slider.Hitbox.MouseEnter:Connect(function()
@@ -4707,6 +5091,10 @@ return function(Toolkit, Veil)
 			slider:_refreshTrack()
 		end)
 
+		if shouldPersist then
+			registerPersistedControl(tab, slider)
+		end
+		registerTabControl(tab, slider)
 		return slider
 	end
 
@@ -4714,6 +5102,7 @@ return function(Toolkit, Veil)
 
 	function Window:_createRangeSlider(tab, options)
 		options = options or {}
+		local shouldPersist = options.Persist ~= false
 
 		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
 		ensureColumnStack(parentColumn)
@@ -4753,6 +5142,9 @@ return function(Toolkit, Veil)
 			Tab = tab,
 			Window = self,
 		}
+		if shouldPersist then
+			assignPersistKey(tab, slider, options, "RangeSlider")
+		end
 
 		slider.Holder = createTextRow(parentColumn, slider.Name, rowHeight)
 		slider.Holder.LayoutOrder = type(options.Order) == "number" and options.Order or 999
@@ -4963,6 +5355,19 @@ return function(Toolkit, Veil)
 			return conn
 		end
 
+		function slider:RefreshTheme()
+			self.TitleLabel.TextColor3 = COLORS.Text
+			if self.SubtextLabel then
+				self.SubtextLabel.TextColor3 = COLORS.Text
+			end
+			self.ValueLabel.TextColor3 = COLORS.Text
+			self.TrackBg.BackgroundColor3 = COLORS.ToggleOffBackground
+			self.RangeFill.BackgroundColor3 = COLORS.Accent
+			self.LowThumb.BackgroundColor3 = COLORS.Accent
+			self.HighThumb.BackgroundColor3 = COLORS.Accent
+			self:_refreshTrack()
+		end
+
 		local activeThumb = nil
 
 		local function pickThumb(inputX)
@@ -5041,7 +5446,246 @@ return function(Toolkit, Veil)
 			slider:_refreshTrack()
 		end)
 
+		if shouldPersist then
+			registerPersistedControl(tab, slider)
+		end
+		registerTabControl(tab, slider)
 		return slider
+	end
+
+	function Window:_getPersistenceRegistry()
+		local registry = {}
+
+		for _, tab in ipairs(self.Tabs) do
+			for _, control in ipairs(tab.PersistControls or {}) do
+				if type(control.PersistKey) == "string" and control.PersistKey ~= "" then
+					registry[control.PersistKey] = control
+				end
+			end
+
+			for _, accessory in ipairs(tab.AccessoryControls or {}) do
+				if type(accessory.PersistKey) == "string" and accessory.PersistKey ~= "" then
+					registry[accessory.PersistKey] = accessory
+				end
+			end
+		end
+
+		return registry
+	end
+
+	function Window:SerializeConfig()
+		local payload = {
+			Version = 1,
+			Controls = {},
+			Window = {
+				BlurEnabled = self.BackgroundBlurEnabled == true,
+				IconPack = IconProvider.ActivePack,
+			},
+		}
+
+		for key, control in pairs(self:_getPersistenceRegistry()) do
+			if control.Type == "Toggle" then
+				payload.Controls[key] = control.Value == true
+			elseif control.Type == "Dropdown" then
+				payload.Controls[key] = control.MultiSelect and control:GetValue() or control.Value
+			elseif control.Type == "Input" then
+				payload.Controls[key] = control:GetValue()
+			elseif control.Type == "Slider" or control.Type == "NotchedSlider" then
+				payload.Controls[key] = control:GetValue()
+			elseif control.Type == "RangeSlider" then
+				local low, high = control:GetValue()
+				payload.Controls[key] = {
+					Low = low,
+					High = high,
+				}
+			elseif control.Type == "Keypicker" then
+				payload.Controls[key] = {
+					Key = control:GetKey(),
+					Mode = control:GetMode(),
+				}
+			elseif control.Type == "Colorpicker" then
+				payload.Controls[key] = {
+					Color = colorToHex(control:GetColor()),
+					Alpha = control.Alpha or 0,
+				}
+			end
+		end
+
+		return payload
+	end
+
+	function Window:ApplyConfig(payload)
+		if type(payload) ~= "table" then
+			return false
+		end
+
+		local controls = payload.Controls
+		local registry = self:_getPersistenceRegistry()
+		if type(controls) == "table" then
+			for key, value in pairs(controls) do
+				local control = registry[key]
+				if control then
+					if control.Type == "Toggle" then
+						control:Set(value, { Silent = true })
+					elseif control.Type == "Dropdown" then
+						if control.MultiSelect then
+							control:SetValues(type(value) == "table" and value or {}, { Silent = true })
+						else
+							control:Set(value, { Silent = true })
+						end
+					elseif control.Type == "Input" then
+						control:Set(value, { Silent = true })
+					elseif control.Type == "Slider" or control.Type == "NotchedSlider" then
+						control:Set(value, { Silent = true, Instant = true })
+					elseif control.Type == "RangeSlider" and type(value) == "table" then
+						control:Set(value.Low, value.High, { Silent = true, Instant = true })
+					elseif control.Type == "Keypicker" and type(value) == "table" then
+						if value.Key ~= nil then
+							control:SetKey(value.Key, { Silent = true })
+						end
+						if value.Mode ~= nil then
+							control:SetMode(value.Mode, { Silent = true })
+						end
+					elseif control.Type == "Colorpicker" then
+						local colorValue = type(value) == "table" and value.Color or value
+						local resolved = colorFromValue(colorValue, control:GetColor())
+						control:SetColor(resolved, { Silent = true })
+					end
+				end
+			end
+		end
+
+		if type(payload.Window) == "table" then
+			if payload.Window.BlurEnabled ~= nil then
+				self:SetBackgroundBlurEnabled(payload.Window.BlurEnabled == true)
+			end
+			if type(payload.Window.IconPack) == "string" then
+				Axis:SetIconPack(payload.Window.IconPack)
+			end
+		end
+
+		return true
+	end
+
+	function Window:SerializeTheme()
+		local theme = {}
+		for _, key in ipairs(THEME_KEYS) do
+			theme[key] = colorToHex(COLORS[key])
+		end
+		return theme
+	end
+
+	function Window:RefreshTheme()
+		if self.WindowBackground then
+			self.WindowBackground.BackgroundColor3 = COLORS.Window
+		end
+		if self.TabContentHost then
+			self.TabContentHost.BackgroundColor3 = COLORS.Window
+		end
+		if self.TitlebarText then
+			self.TitlebarText.TextColor3 = COLORS.Text
+		end
+		if self.StatusChip then
+			self.StatusChip.BackgroundColor3 = COLORS.Accent
+			self.StatusChip.TextColor3 = COLORS.Accent
+		end
+		if self.SelectionHighlight then
+			self.SelectionHighlight.BackgroundColor3 = COLORS.Accent
+		end
+		if self.TitlebarShell then
+			for _, descendant in ipairs(self.Titlebar:GetDescendants()) do
+				if descendant:IsA("Frame") and (descendant.Name == "Shell" or descendant.Name == "BottomFill") then
+					descendant.BackgroundColor3 = COLORS.Titlebar
+				elseif descendant:IsA("Frame") and descendant.Name == "AxisStrokeLine" then
+					descendant.BackgroundColor3 = COLORS.Stroke
+				end
+			end
+		end
+		if self.SidebarShell then
+			for _, descendant in ipairs(self.Sidebar:GetDescendants()) do
+				if descendant:IsA("Frame") and (descendant.Name == "Shell" or descendant.Name == "TopFill" or descendant.Name == "RightFill") then
+					descendant.BackgroundColor3 = COLORS.Sidebar
+				elseif descendant:IsA("Frame") and descendant.Name == "AxisStrokeLine" then
+					descendant.BackgroundColor3 = COLORS.Stroke
+				end
+			end
+		end
+		if self.SettingsDivider then
+			self.SettingsDivider.BackgroundColor3 = COLORS.Stroke
+		end
+		if self.Cursor then
+			for _, descendant in ipairs(self.Cursor:GetChildren()) do
+				if descendant.Name == "VerticalStroke" or descendant.Name == "HorizontalStroke" then
+					descendant.BackgroundColor3 = COLORS.Window
+				elseif descendant.Name == "VerticalFill" or descendant.Name == "HorizontalFill" then
+					descendant.BackgroundColor3 = COLORS.Accent
+				end
+			end
+		end
+
+		for _, tab in ipairs(self.Tabs) do
+			if tab.Highlight then
+				tab.Highlight.BackgroundColor3 = COLORS.Accent
+			end
+			if tab.ColumnLayout then
+				for _, line in ipairs(tab.ColumnLayout.Lines or {}) do
+					line.BackgroundColor3 = COLORS.Stroke
+				end
+				for _, handle in ipairs(tab.ColumnLayout.Handles or {}) do
+					handle.BackgroundColor3 = COLORS.Stroke
+				end
+				for _, guide in ipairs(tab.ColumnLayout.Guides or {}) do
+					local dash = guide:FindFirstChild("DashList")
+					if dash then
+						for _, child in ipairs(dash:GetChildren()) do
+							if child:IsA("Frame") then
+								child.BackgroundColor3 = COLORS.Accent
+							end
+						end
+					end
+				end
+			end
+			for _, control in ipairs(tab.Controls or {}) do
+				if type(control.RefreshTheme) == "function" then
+					control:RefreshTheme()
+				end
+			end
+			for _, accessory in ipairs(tab.AccessoryControls or {}) do
+				if type(accessory.RefreshTheme) == "function" then
+					accessory:RefreshTheme()
+				end
+			end
+			setTabButtonVisual(tab, tab == self.SelectedTab, COLORS)
+		end
+
+		if self.Tooltip then
+			self.Tooltip.BackgroundColor3 = COLORS.Window
+		end
+		if self.TooltipLabel then
+			self.TooltipLabel.TextColor3 = COLORS.Text
+		end
+		if Axis.PickerSurface then
+			for _, descendant in ipairs(Axis.PickerSurface:GetDescendants()) do
+				if descendant:IsA("UIStroke") then
+					descendant.Color = COLORS.Stroke
+				end
+			end
+		end
+	end
+
+	function Window:ApplyTheme(theme)
+		if type(theme) ~= "table" then
+			return false
+		end
+
+		for _, key in ipairs(THEME_KEYS) do
+			if theme[key] ~= nil then
+				COLORS[key] = colorFromValue(theme[key], COLORS[key])
+			end
+		end
+
+		self:RefreshTheme()
+		return true
 	end
 
 	Axis.Surface = Veil.GUI:CreateRoot("Axis")
@@ -5293,8 +5937,43 @@ return function(Toolkit, Veil)
 		self.ActivePickerPopup = nil
 	end
 
+	function Axis:GetTheme()
+		local theme = {}
+		for _, key in ipairs(THEME_KEYS) do
+			theme[key] = colorToHex(COLORS[key])
+		end
+		return theme
+	end
+
+	function Axis:SetTheme(theme)
+		for _, window in ipairs(self.Windows) do
+			window:ApplyTheme(theme)
+		end
+	end
+
+	function Axis:SetThemeColor(key, value)
+		if COLORS[key] == nil then
+			return false
+		end
+
+		local resolved = colorFromValue(value, COLORS[key])
+		COLORS[key] = resolved
+		for _, window in ipairs(self.Windows) do
+			window:RefreshTheme()
+		end
+		return true
+	end
+
+	function Axis:GetThemeKeys()
+		return table.clone(THEME_KEYS)
+	end
+
 	function Axis:SetIconPack(packName)
 		IconProvider:SetPack(packName)
+	end
+
+	function Axis:GetIconPack()
+		return IconProvider.ActivePack
 	end
 
 	return Axis

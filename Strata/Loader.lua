@@ -222,6 +222,182 @@ local function failLoader(message, detail)
 	error(message, 0)
 end
 
+local function sanitizeStorageName(value, fallback)
+	local text = tostring(value or "")
+	text = text:gsub("[\\/:*?\"<>|]", "")
+	text = text:gsub("^%s+", ""):gsub("%s+$", "")
+	text = text:gsub("%s+", " ")
+	if text == "" then
+		return fallback
+	end
+	return text
+end
+
+local function createManagerButton(column, name, callback, style)
+	return column:Button({
+		Name = name,
+		Style = style or "secondary",
+		Callback = callback,
+	})
+end
+
+local function buildStorageManager(column, options)
+	local storage = context.Toolkit.Storage
+	local folder = options.Folder
+	local title = options.Title
+	local emptyLabel = options.EmptyLabel or "None"
+	local serialize = options.Serialize
+	local apply = options.Apply
+	local defaultName = options.DefaultName or "Default"
+
+	storage:EnsureFolder(folder)
+
+	local state = {
+		Selected = nil,
+	}
+
+	column:SectionHeader(title)
+
+	local nameInput = column:Input({
+		Name = title .. " Name",
+		Default = defaultName,
+		Persist = false,
+	})
+
+	local listDropdown = column:Dropdown({
+		Name = title .. " List",
+		Items = { emptyLabel },
+		Default = emptyLabel,
+		Persist = false,
+	})
+
+	local function readList()
+		local items = storage:List(folder, ".json")
+		if #items == 0 then
+			return { emptyLabel }
+		end
+		return items
+	end
+
+	local function refreshList(selectName)
+		local items = readList()
+		listDropdown:SetItems(items)
+		local target = selectName or state.Selected
+		if target and table.find(items, target) then
+			listDropdown:Set(target, { Silent = true })
+			state.Selected = target
+		else
+			listDropdown:Set(items[1], { Silent = true })
+			state.Selected = items[1] ~= emptyLabel and items[1] or nil
+		end
+	end
+
+	listDropdown:OnChanged(function(value)
+		if value == emptyLabel then
+			state.Selected = nil
+			return
+		end
+		state.Selected = value
+		nameInput:Set(value, { Silent = true })
+	end)
+
+	createManagerButton(column, "Refresh " .. title, function()
+		refreshList()
+		context.Axis:Toast({
+			Title = title,
+			Message = "List refreshed",
+			Location = "BottomCenter",
+			Duration = 2.4,
+		})
+	end, "secondary")
+
+	createManagerButton(column, "Save " .. title, function()
+		local name = sanitizeStorageName(nameInput:GetValue(), nil)
+		if not name then
+			context.Axis:Notify({
+				Title = title,
+				Message = "Enter a valid name before saving",
+				Location = "TopRight",
+				Duration = 3,
+			})
+			return
+		end
+
+		local ok = storage:WriteJson(folder .. "/" .. name .. ".json", serialize())
+		if ok then
+			refreshList(name)
+			context.Axis:Toast({
+				Title = title,
+				Message = "Saved " .. name,
+				Location = "BottomCenter",
+			})
+		end
+	end)
+
+	createManagerButton(column, "Overwrite " .. title, function()
+		local name = state.Selected or sanitizeStorageName(nameInput:GetValue(), nil)
+		if not name then
+			context.Axis:Notify({
+				Title = title,
+				Message = "Select an existing entry to overwrite",
+				Location = "TopRight",
+				Duration = 3,
+			})
+			return
+		end
+
+		local ok = storage:WriteJson(folder .. "/" .. name .. ".json", serialize())
+		if ok then
+			refreshList(name)
+			context.Axis:Toast({
+				Title = title,
+				Message = "Overwrote " .. name,
+				Location = "BottomCenter",
+			})
+		end
+	end)
+
+	createManagerButton(column, "Load " .. title, function()
+		local name = state.Selected
+		if not name then
+			context.Axis:Notify({
+				Title = title,
+				Message = "Select a saved entry first",
+				Location = "TopRight",
+				Duration = 3,
+			})
+			return
+		end
+
+		local payload = storage:ReadJson(folder .. "/" .. name .. ".json", nil)
+		if type(payload) ~= "table" then
+			context.Axis:Notify({
+				Title = title,
+				Message = "Failed to read " .. name,
+				Location = "TopRight",
+				Duration = 3,
+			})
+			return
+		end
+
+		apply(payload)
+		nameInput:Set(name, { Silent = true })
+		context.Axis:Toast({
+			Title = title,
+			Message = "Loaded " .. name,
+			Location = "BottomCenter",
+		})
+	end)
+
+	refreshList()
+
+	return {
+		NameInput = nameInput,
+		ListDropdown = listDropdown,
+		Refresh = refreshList,
+	}
+end
+
 local steps = {
 	{
 		Text = "Loading Toolkit...",
@@ -264,7 +440,7 @@ local steps = {
 		Text = "Axis: building interface",
 		Error = "[Strata Loader] Failed to initialize Axis shell",
 		Run = function()
-			context.Axis:CreateWindow({})
+			context.Window = context.Axis:CreateWindow({})
 		end,
 	},
 
@@ -441,18 +617,114 @@ local steps = {
 				Icon = "settings",
 				IconScale = 0.8,
 				PinnedBottom = true,
+				ColumnMode = "Triple",
+			})
+			local settingsLeft = settingsTab.Columns.leftColumn
+			local settingsMiddle = settingsTab.Columns.middleColumn
+			local settingsRight = settingsTab.Columns.rightColumn
+
+			settingsLeft:SectionHeader("Interface")
+
+			local visibilityLabel = settingsLeft:Label({
+				Text = "Window Visibility",
+				Subtext = "Show or hide the Strata window",
+				PersistKey = "Settings.WindowVisibilityLabel",
 			})
 
-			settingsTab.Columns.rightColumn:SectionHeader("Settings")
+			visibilityLabel:AddKeypicker({
+				Default = "RightShift",
+				Mode = "Toggle",
+				PersistKey = "Settings.WindowVisibilityKeybind",
+				Callback = function()
+					if context.Window then
+						context.Window:ToggleVisible()
+					end
+				end,
+			})
 
-			settingsTab.Columns.rightColumn:Dropdown({
+			settingsLeft:CreateToggle({
+				Text = "Background Blur",
+				Subtext = "Blur the scene behind Strata while it is visible",
+				Default = false,
+				PersistKey = "Settings.BackgroundBlur",
+				Callback = function(value)
+					if context.Window then
+						context.Window:SetBackgroundBlurEnabled(value)
+					end
+				end,
+			})
+
+			settingsLeft:Dropdown({
 				Name = "Icon Pack",
 				Items = { "Lucide", "Phosphor" },
-				Default = "Phosphor",
+				Default = context.Axis:GetIconPack(),
+				PersistKey = "Settings.IconPack",
 				Callback = function(value)
 					context.Axis:SetIconPack(value)
 				end,
 			})
+
+			buildStorageManager(settingsMiddle, {
+				Title = "Config",
+				Folder = "Configs",
+				DefaultName = "Default",
+				PersistKeyPrefix = "Settings.ConfigManager",
+				Serialize = function()
+					return context.Window:SerializeConfig()
+				end,
+				Apply = function(payload)
+					context.Window:ApplyConfig(payload)
+				end,
+			})
+
+			local themePickers = {}
+			local function syncThemePickers()
+				local currentTheme = context.Axis:GetTheme()
+				for key, picker in pairs(themePickers) do
+					local hex = currentTheme[key]
+					if hex then
+						local color = Color3.fromRGB(
+							tonumber(hex:sub(2, 3), 16),
+							tonumber(hex:sub(4, 5), 16),
+							tonumber(hex:sub(6, 7), 16)
+						)
+						picker:SetColor(color, { Silent = true })
+					end
+				end
+			end
+
+			local themeManager = buildStorageManager(settingsRight, {
+				Title = "Theme",
+				Folder = "Themes",
+				DefaultName = "Rose",
+				PersistKeyPrefix = "Settings.ThemeManager",
+				Serialize = function()
+					return context.Window:SerializeTheme()
+				end,
+				Apply = function(payload)
+					context.Window:ApplyTheme(payload)
+					syncThemePickers()
+				end,
+			})
+
+			settingsRight:SectionHeader("Theme Colors")
+
+			for _, key in ipairs(context.Axis:GetThemeKeys()) do
+				local row = settingsRight:Label({
+					Text = key,
+					Persist = false,
+				})
+				themePickers[key] = row:AddColorpicker({
+					Default = Color3.fromRGB(255, 255, 255),
+					Persist = false,
+					Callback = function(color)
+						context.Axis:SetThemeColor(key, color)
+					end,
+				})
+			end
+
+			syncThemePickers()
+			themeManager.Refresh()
 		end,
 	},
 
