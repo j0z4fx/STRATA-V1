@@ -757,5 +757,57 @@ return function(Toolkit)
 		return Veil.Protection:Apply(instance)
 	end
 
+	-- ── Security hardening ────────────────────────────────────────────────────
+	-- Wraps Lua closures as C closures so getupvalues cannot traverse internal
+	-- state. Locks class metatables so __index cannot be hooked externally.
+
+	local function _wrapIfLua(fn)
+		if type(newcclosure) ~= "function" then return fn end
+		local ok, wrapped = pcall(newcclosure, fn)
+		return (ok and wrapped) or fn
+	end
+
+	local function _hardenMeta(meta)
+		for k, v in pairs(meta) do
+			if type(v) == "function" then
+				rawset(meta, k, _wrapIfLua(v))
+			end
+		end
+		-- Hides real metatable from getmetatable; set before setreadonly
+		if rawget(meta, "__metatable") == nil then
+			rawset(meta, "__metatable", "locked")
+		end
+		-- Freezes metatable so __index/__newindex cannot be replaced
+		if type(setreadonly) == "function" then
+			pcall(setreadonly, meta, true)
+		end
+	end
+
+	_hardenMeta(ServiceIsolation)
+	_hardenMeta(InstanceControl)
+	_hardenMeta(GUI)
+	_hardenMeta(Hooks)
+	_hardenMeta(Env)
+	_hardenMeta(Security)
+	_hardenMeta(SoundControl)
+	_hardenMeta(Protection)
+
+	-- Config uses direct method assignment (no metatable), wrap individually
+	for k, v in pairs(Config) do
+		if type(v) == "function" then
+			Config[k] = _wrapIfLua(v)
+		end
+	end
+
+	Veil.Protect = _wrapIfLua(Veil.Protect)
+
+	-- Block external mutation of the Veil table itself
+	setmetatable(Veil, {
+		__newindex = function(_, k, _v)
+			error("[Veil] Cannot mutate Veil externally: " .. tostring(k), 2)
+		end,
+		__metatable = "locked",
+	})
+
 	return Veil
 end
