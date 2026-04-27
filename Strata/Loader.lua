@@ -422,18 +422,23 @@ local steps = {
 	{ Text = "Veil: binding environment" },
 	{ Text = "Veil: securing interfaces" },
 	{ Text = "Veil: ready" },
-
+	
 	{
-		Text = "Loading Axis...",
-		Error = "[Strata Loader] Failed to load Axis",
-		Run = function()
-			local axisFactory = loadstring(Fetch(AXIS_URL))()
-			context.Axis = axisFactory(context.Toolkit, context.Veil)
-
-			if context.Axis and context.Axis.Surface and context.Axis.Surface:IsA("ScreenGui") then
-				context.Axis.Surface.Enabled = false
-			end
-		end,
+	    Text = "Loading Axis...",
+	    Error = "[Strata Loader] Failed to load Axis",
+	    Run = function()
+	        local loaded = loadstring(Fetch(AXIS_URL))()
+	
+	        if type(loaded) == "function" then
+	            context.Axis = loaded(context.Toolkit, context.Veil)
+	        else
+	            context.Axis = loaded
+	        end
+	
+	        if context.Axis and context.Axis.Surface and context.Axis.Surface:IsA("ScreenGui") then
+	            context.Axis.Surface.Enabled = false
+	        end
+	    end,
 	},
 
 	{
