@@ -13,9 +13,10 @@ local homeTab = Axis:CreateTab({
 	Icon = "house",
 })
 
-Axis:CreateTab({
+local profileTab = Axis:CreateTab({
 	Name = "Profile",
 	Icon = "user-round",
+	ShowCharacterViewer = true,
 })
 
 local settingsTab = Axis:CreateTab({
@@ -238,6 +239,9 @@ middle:RangeSlider({
 	Step = 5,
 	Subtext = "Minimum and maximum range",
 })
+
+-- Character viewer (appears beside window when Profile tab active)
+Axis:CreateCharacterViewer(window)
 
 -- Keybind overlay (toggle with RightAlt)
 Axis:CreateKeybindOverlay({

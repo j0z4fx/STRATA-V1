@@ -2090,7 +2090,19 @@ return function(Toolkit, Veil)
 			setTabButtonVisual(entry, entry == self.SelectedTab, COLORS)
 		end
 
+		-- Notify tab select hooks (e.g. character viewer)
+		if self._tabSelectHooks then
+			for _, fn in ipairs(self._tabSelectHooks) do
+				task.spawn(pcall, fn, self.SelectedTab)
+			end
+		end
+
 		return self.SelectedTab
+	end
+
+	function Window:OnTabSelected(fn)
+		self._tabSelectHooks = self._tabSelectHooks or {}
+		table.insert(self._tabSelectHooks, fn)
 	end
 
 	function Window:CreateTab(options)
@@ -6985,6 +6997,152 @@ return function(Toolkit, Veil)
 			Veil.Instance:SecureDestroy(self._searchSurface)
 			self._searchSurface = nil
 		end
+	end
+
+	-- ── Character Viewer ─────────────────────────────────────────────────────
+
+	local CharViewerWidth = 180
+	local CharViewerGap = 12
+	local CharViewerSpinSpeed = 25  -- degrees per second
+
+	function Axis:CreateCharacterViewer(sourceWindow, options)
+		options = options or {}
+
+		local Players = Veil.Services:Get("Players")
+		local lp = Players and Players.LocalPlayer
+		if not lp then return nil end
+
+		-- Panel frame on the surface, positioned right of the window
+		local panel = Veil.Instance:Create("Frame", {
+			Name = "CharacterViewer",
+			BackgroundColor3 = COLORS.Window,
+			BackgroundTransparency = 0,
+			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(CharViewerWidth, 300), -- height updated per frame
+			Visible = false,
+			ZIndex = 5,
+			Parent = self.Surface,
+		})
+		createCorner(panel, 14)
+		createBorder(panel)
+
+		-- ViewportFrame fills the panel
+		local vf = Veil.Instance:Create("ViewportFrame", {
+			Name = "Viewport",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			LightColor = Color3.fromRGB(220, 220, 235),
+			LightDirection = Vector3.new(-1, -2, -1),
+			Position = UDim2.fromOffset(0, 0),
+			Size = UDim2.fromScale(1, 1),
+			ZIndex = 6,
+			Parent = panel,
+		})
+
+		-- WorldModel inside viewport
+		local worldModel = Veil.Instance:Create("WorldModel", {
+			Parent = vf,
+		})
+
+		-- Camera
+		local cam = Instance.new("Camera")
+		cam.CameraType = Enum.CameraType.Scriptable
+		cam.FieldOfView = 50
+		cam.Parent = vf
+		vf.CurrentCamera = cam
+
+		-- Build character in background
+		local charModel = nil
+		local spinAngle = 0
+
+		task.spawn(function()
+			local char = lp.Character
+			local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+			if not humanoid then return end
+
+			local ok, desc = pcall(function()
+				return humanoid:GetAppliedDescription()
+			end)
+			if not ok or not desc then return end
+
+			local ok2, model = pcall(function()
+				return Players:CreateHumanoidModelFromDescription(desc, Enum.HumanoidRigType.R6)
+			end)
+			if not ok2 or not model then return end
+
+			-- Remove scripts
+			for _, s in ipairs(model:GetDescendants()) do
+				if s:IsA("Script") or s:IsA("LocalScript") or s:IsA("ModuleScript") then
+					s:Destroy()
+				end
+			end
+
+			charModel = model
+			charModel.Parent = worldModel
+
+			-- Position character at world origin, standing
+			local root = charModel:FindFirstChild("HumanoidRootPart")
+			if root then
+				charModel:PivotTo(CFrame.new(0, 0, 0))
+			end
+
+			-- Position camera to frame the character
+			local headPos = charModel:FindFirstChild("Head")
+			local eyeY = headPos and (headPos.Position.Y + 0.3) or 1.8
+			cam.CFrame = CFrame.new(0, eyeY - 0.3, 3.2) * CFrame.Angles(0, math.rad(180), 0)
+		end)
+
+		-- Heartbeat: spin + reposition panel
+		local heartConn = RunService.Heartbeat:Connect(function(dt)
+			if not panel.Parent then return end
+			if not panel.Visible then return end
+
+			-- Reposition panel next to window
+			if sourceWindow and sourceWindow.Frame then
+				local winPos = sourceWindow.Frame.AbsolutePosition
+				local winSize = sourceWindow.Frame.AbsoluteSize
+				local screenH = sourceWindow.Frame.Parent and sourceWindow.Frame.Parent.AbsoluteSize.Y or 600
+				local panelH = winSize.Y
+				panel.Position = UDim2.fromOffset(winPos.X + winSize.X + CharViewerGap, winPos.Y)
+				panel.Size = UDim2.fromOffset(CharViewerWidth, panelH)
+			end
+
+			-- Spin character
+			if charModel and charModel.Parent then
+				spinAngle = (spinAngle + CharViewerSpinSpeed * dt) % 360
+				charModel:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(spinAngle), 0))
+			end
+		end)
+
+		panel.AncestryChanged:Connect(function()
+			if not panel.Parent then heartConn:Disconnect() end
+		end)
+
+		-- Tab selection hook: show when ShowCharacterViewer tab is selected
+		sourceWindow:OnTabSelected(function(selectedTab)
+			local shouldShow = selectedTab and selectedTab.ShowCharacterViewer == true
+			panel.Visible = shouldShow == true
+		end)
+
+		-- Initial visibility check
+		local selTab = sourceWindow.SelectedTab
+		panel.Visible = selTab and selTab.ShowCharacterViewer == true
+
+		local viewer = {
+			Panel = panel,
+			Viewport = vf,
+		}
+
+		function viewer:Show() panel.Visible = true end
+		function viewer:Hide() panel.Visible = false end
+		function viewer:Destroy()
+			heartConn:Disconnect()
+			Veil.Instance:SecureDestroy(panel)
+			if charModel then charModel:Destroy() end
+			if cam then cam:Destroy() end
+		end
+
+		return viewer
 	end
 
 	-- ── Keybind Overlay ──────────────────────────────────────────────────────
