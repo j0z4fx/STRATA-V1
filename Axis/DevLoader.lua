@@ -252,6 +252,9 @@ Axis:CreateCrosshair(window, {
 -- Character viewer (appears beside window when Profile tab active)
 Axis:CreateCharacterViewer(window)
 
+-- Security scanner (creates its own "Scanner" tab)
+Axis:CreateScanner(window)
+
 -- Keybind overlay (toggle with RightAlt)
 Axis:CreateKeybindOverlay({
 	Title = "Keybinds",

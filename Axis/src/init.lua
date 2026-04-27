@@ -7834,6 +7834,178 @@ return function(Toolkit, Veil)
 		end)
 	end
 
+	function Axis:CreateScanner(sourceWindow)
+		assert(sourceWindow, "[Axis] CreateScanner requires a window")
+
+		local scannerTab = sourceWindow:CreateTab({ Name = "Scanner", Icon = "shield-alert", IconScale = 0.82 })
+		local left = scannerTab.Columns.leftColumn
+		local right = scannerTab.Columns.rightColumn
+
+		-- Status label (updated after each scan)
+		local statusLabel = left:Label({ Name = "Status", Subtext = "Press Scan to begin" })
+
+		left:Button({
+			Name = "Run Scan",
+			Callback = function()
+				local results, err = Veil.Scanner:Run()
+				if not results then
+					statusLabel.SetSubtext and statusLabel:SetSubtext("Error: " .. tostring(err))
+					self:Notify({ Title = "Scanner", Message = tostring(err), Type = "Error" })
+					return
+				end
+
+				-- Update status
+				local count = #results
+				if statusLabel.SetSubtext then
+					statusLabel:SetSubtext(count == 0 and "No threats detected" or count .. " item(s) flagged")
+				end
+
+				-- Clear previous result rows
+				local resultFrame = right.Frame:FindFirstChild("ScanResults")
+				if resultFrame then resultFrame:Destroy() end
+
+				-- Build result container
+				local rowH = 42
+				local padV = 6
+				local container = Veil.Instance:Create("ScrollingFrame", {
+					Name = "ScanResults",
+					Size = UDim2.new(1, 0, 1, 0),
+					BackgroundTransparency = 1,
+					CanvasSize = UDim2.new(0, 0, 0, 0),
+					AutomaticCanvasSize = Enum.AutomaticSize.Y,
+					ScrollBarThickness = 3,
+					ScrollBarImageTransparency = 0.55,
+					ScrollBarImageColor3 = COLORS.Stroke,
+					ScrollingDirection = Enum.ScrollingDirection.Y,
+					LayoutOrder = nextOrder(right.Frame),
+					Parent = right.Frame,
+				})
+
+				local listLayout = Veil.Instance:Create("UIListLayout", {
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 4),
+					Parent = container,
+				})
+				local listPad = Veil.Instance:Create("UIPadding", {
+					PaddingTop = UDim.new(0, padV),
+					PaddingBottom = UDim.new(0, padV),
+					PaddingLeft = UDim.new(0, 6),
+					PaddingRight = UDim.new(0, 6),
+					Parent = container,
+				})
+				-- silence unused warning
+				local _ = listLayout
+				local __ = listPad
+
+				if count == 0 then
+					Veil.Instance:Create("TextLabel", {
+						Size = UDim2.new(1, 0, 0, 32),
+						BackgroundTransparency = 1,
+						Text = "No threats detected",
+						TextColor3 = COLORS.Text,
+						TextTransparency = 0.5,
+						Font = Enum.Font.Gotham,
+						TextSize = 12,
+						LayoutOrder = 1,
+						Parent = container,
+					})
+				else
+					for i, result in ipairs(results) do
+						local row = Veil.Instance:Create("Frame", {
+							Size = UDim2.new(1, 0, 0, rowH),
+							BackgroundColor3 = COLORS.Titlebar,
+							LayoutOrder = i,
+							Parent = container,
+						})
+						Veil.Instance:Create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = row })
+						Veil.Instance:Create("UIStroke", {
+							Color = COLORS.Stroke,
+							Transparency = 0.88,
+							Thickness = 1,
+							Parent = row,
+						})
+
+						-- Name (top left)
+						Veil.Instance:Create("TextLabel", {
+							Position = UDim2.new(0, 8, 0, 4),
+							Size = UDim2.new(1, -100, 0, 18),
+							BackgroundTransparency = 1,
+							Text = tostring(result.Name):sub(1, 36),
+							TextColor3 = COLORS.Text,
+							Font = Enum.Font.GothamBold,
+							TextSize = 11,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							TextTruncate = Enum.TextTruncate.AtEnd,
+							Parent = row,
+						})
+
+						-- Reason (bottom left)
+						Veil.Instance:Create("TextLabel", {
+							Position = UDim2.new(0, 8, 0, 22),
+							Size = UDim2.new(1, -100, 0, 14),
+							BackgroundTransparency = 1,
+							Text = tostring(result.Reason):sub(1, 52),
+							TextColor3 = COLORS.Text,
+							TextTransparency = 0.4,
+							Font = Enum.Font.Gotham,
+							TextSize = 10,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							TextTruncate = Enum.TextTruncate.AtEnd,
+							Parent = row,
+						})
+
+						-- Copy button
+						local copyBtn = Veil.Instance:Create("TextButton", {
+							Position = UDim2.new(1, -90, 0.5, -10),
+							Size = UDim2.new(0, 40, 0, 20),
+							BackgroundColor3 = COLORS.Window,
+							Text = "Copy",
+							TextColor3 = COLORS.Text,
+							TextTransparency = 0.3,
+							Font = Enum.Font.Gotham,
+							TextSize = 10,
+							Parent = row,
+						})
+						Veil.Instance:Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = copyBtn })
+						local capturedPath = result.Path
+						copyBtn.MouseButton1Click:Connect(function()
+							local ok = Veil.Scanner:CopyPath(capturedPath)
+							if ok then
+								self:Notify({ Title = "Scanner", Message = "Path copied", Duration = 2 })
+							else
+								self:Notify({ Title = "Scanner", Message = "Clipboard unavailable", Type = "Warning", Duration = 2 })
+							end
+						end)
+
+						-- Kill button (only for Script refs)
+						local killBtn = Veil.Instance:Create("TextButton", {
+							Position = UDim2.new(1, -44, 0.5, -10),
+							Size = UDim2.new(0, 36, 0, 20),
+							BackgroundColor3 = Color3.fromRGB(80, 28, 30),
+							Text = "Kill",
+							TextColor3 = Color3.fromRGB(255, 120, 120),
+							Font = Enum.Font.GothamBold,
+							TextSize = 10,
+							AutoButtonColor = false,
+							Parent = row,
+						})
+						Veil.Instance:Create("UICorner", { CornerRadius = UDim.new(0, 4), Parent = killBtn })
+						local capturedRef = result.ScriptRef
+						killBtn.MouseButton1Click:Connect(function()
+							if capturedRef then
+								Veil.Scanner:Kill(capturedRef)
+								row.BackgroundColor3 = Color3.fromRGB(30, 22, 22)
+								self:Notify({ Title = "Scanner", Message = "Killed: " .. tostring(result.Name), Duration = 3 })
+							else
+								self:Notify({ Title = "Scanner", Message = "No script ref — cannot kill closure", Type = "Warning", Duration = 2 })
+							end
+						end)
+					end
+				end
+			end,
+		})
+	end
+
 	function Axis:SetAntiAFK(enabled)
 		if enabled then
 			if self._antiAFKConn then return end

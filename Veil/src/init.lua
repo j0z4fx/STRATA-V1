@@ -735,6 +735,161 @@ return function(Toolkit)
 		self:StopAll()
 	end
 
+	-- ── Scanner ───────────────────────────────────────────────────────────────
+	-- GC-based security scanner. Inspects live Lua closures and game Scripts for
+	-- patterns that indicate anti-cheat or monitoring code.
+
+	local Scanner = {}
+	Scanner.__index = Scanner
+
+	local _SUSPECT_PATTERNS = {
+		"anticheat", "anti.?cheat", "hyperion", "byfron",
+		"getexecutorname", "is_exploit", "exploit.?detect",
+		"script.?monitor", "script.?watcher",
+		"kick%.player", "banplayer", "punish",
+	}
+
+	local function _matchSuspect(str)
+		if type(str) ~= "string" then return nil end
+		local lower = str:lower()
+		for _, pat in ipairs(_SUSPECT_PATTERNS) do
+			if lower:match(pat) then return pat end
+		end
+		return nil
+	end
+
+	local function _safeGCFunctions()
+		if type(getgc) ~= "function" then return {} end
+		local ok, gc = pcall(getgc, false)
+		return (ok and type(gc) == "table") and gc or {}
+	end
+
+	local function _safeConstants(fn)
+		if type(getconstants) ~= "function" then return {} end
+		local ok, c = pcall(getconstants, fn)
+		return (ok and type(c) == "table") and c or {}
+	end
+
+	local function _safeUpvalueNames(fn)
+		if type(getupvalues) ~= "function" then return {} end
+		local ok, u = pcall(getupvalues, fn)
+		if not ok or type(u) ~= "table" then return {} end
+		local names = {}
+		for k in pairs(u) do
+			if type(k) == "string" then table.insert(names, k) end
+		end
+		return names
+	end
+
+	local function _safeScripts()
+		if type(getscripts) ~= "function" then return {} end
+		local ok, s = pcall(getscripts)
+		return (ok and type(s) == "table") and s or {}
+	end
+
+	function Scanner.new()
+		return setmetatable({}, Scanner)
+	end
+
+	-- Returns table of {Name, Path, Reason, ScriptRef} or (nil, errMsg) if APIs unavailable
+	function Scanner:Run()
+		if type(getgc) ~= "function" and type(getscripts) ~= "function" then
+			return nil, "No scan APIs available (getgc / getscripts required)"
+		end
+
+		local results = {}
+		local seen = {}
+
+		-- GC closure scan — check string constants for suspicious patterns
+		if type(islclosure) == "function" then
+			for _, obj in ipairs(_safeGCFunctions()) do
+				if type(obj) == "function" and not seen[obj] then
+					local isLua = pcall(islclosure, obj) and islclosure(obj)
+					if isLua then
+						seen[obj] = true
+						for _, c in pairs(_safeConstants(obj)) do
+							local match = _matchSuspect(c)
+							if match then
+								-- Best-effort source location via debug.info
+								local src = "unknown"
+								if type(debug) == "table" and type(debug.info) == "function" then
+									local ok2, s = pcall(debug.info, obj, "s")
+									if ok2 and s then src = s end
+								end
+								table.insert(results, {
+									Name = src:match("[^/\\]+$") or src,
+									Path = src,
+									Reason = 'Constant: "' .. tostring(c):sub(1, 36) .. '"',
+									ScriptRef = nil,
+								})
+								break
+							end
+						end
+						-- Check upvalue names for suspicious identifiers
+						if not seen[obj] then
+							for _, uname in ipairs(_safeUpvalueNames(obj)) do
+								local match = _matchSuspect(uname)
+								if match then
+									table.insert(results, {
+										Name = "closure",
+										Path = "gc:upvalue",
+										Reason = 'Upvalue: "' .. uname .. '"',
+										ScriptRef = nil,
+									})
+									seen[obj] = true
+									break
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+
+		-- Script name/path scan
+		for _, script in ipairs(_safeScripts()) do
+			if typeof(script) == "Instance" and not seen[script] then
+				local ok, fullName = pcall(function() return script:GetFullName() end)
+				local path = ok and fullName or tostring(script)
+				local name = script.Name or "Script"
+				local match = _matchSuspect(name) or _matchSuspect(path)
+				if match then
+					seen[script] = true
+					table.insert(results, {
+						Name = name,
+						Path = path,
+						Reason = "Suspicious name",
+						ScriptRef = script,
+					})
+				end
+			end
+		end
+
+		return results
+	end
+
+	-- Copies path string to system clipboard
+	function Scanner:CopyPath(path)
+		local str = tostring(path)
+		if type(setclipboard) == "function" then
+			pcall(setclipboard, str)
+			return true
+		end
+		if type(toclipboard) == "function" then
+			pcall(toclipboard, str)
+			return true
+		end
+		return false
+	end
+
+	-- Attempts to disable and remove a suspicious Script instance
+	function Scanner:Kill(scriptRef)
+		if typeof(scriptRef) ~= "Instance" then return false end
+		pcall(function() scriptRef.Disabled = true end)
+		pcall(function() scriptRef.Parent = nil end)
+		return true
+	end
+
 	local Veil = {
 		Toolkit = Toolkit,
 		Config = Config,
@@ -749,6 +904,7 @@ return function(Toolkit)
 	Veil.Env = Env.new()
 	Veil.Security = Security.new(Config, Veil.Env)
 	Veil.Sound = SoundControl.new(Toolkit.Sound, Veil.Services, Veil.Instance)
+	Veil.Scanner = Scanner.new()
 
 	Veil.Env:SetGlobal("Toolkit", Toolkit)
 	Veil.Env:SetGlobal("Veil", Veil)
@@ -791,6 +947,7 @@ return function(Toolkit)
 	_hardenMeta(Security)
 	_hardenMeta(SoundControl)
 	_hardenMeta(Protection)
+	_hardenMeta(Scanner)
 
 	-- Config uses direct method assignment (no metatable), wrap individually
 	for k, v in pairs(Config) do
