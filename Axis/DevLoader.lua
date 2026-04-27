@@ -180,6 +180,26 @@ right:Dropdown({
 
 local middle = homeTab.Columns.middleColumn
 
+middle:SectionHeader("Radio — Vertical")
+
+middle:Radio({
+	Name = "Team",
+	Items = { "Alpha", "Bravo", "Charlie" },
+	Default = "Bravo",
+	Orientation = "Vertical",
+	Callback = function(v) print("Radio vertical:", v) end,
+})
+
+middle:SectionHeader("Radio — Horizontal")
+
+middle:Radio({
+	Name = "Mode",
+	Items = { "Easy", "Normal", "Hard" },
+	Default = "Normal",
+	Orientation = "Horizontal",
+	Callback = function(v) print("Radio horizontal:", v) end,
+})
+
 middle:SectionHeader("Notched")
 
 middle:NotchedSlider({

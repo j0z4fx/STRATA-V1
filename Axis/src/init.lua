@@ -2165,6 +2165,11 @@ return function(Toolkit, Veil)
 					elementOptions.ColumnFrame = columnApi.Frame
 					return columnApi.Window:_createCheckbox(columnApi.Tab, elementOptions)
 				end,
+				Radio = function(columnApi, elementOptions)
+					elementOptions = elementOptions or {}
+					elementOptions.ColumnFrame = columnApi.Frame
+					return columnApi.Window:_createRadio(columnApi.Tab, elementOptions)
+				end,
 			}
 		end
 
@@ -2210,6 +2215,9 @@ return function(Toolkit, Veil)
 		end
 		function tab:Checkbox(elementOptions)
 			return self.Window:_createCheckbox(self, elementOptions)
+		end
+		function tab:Radio(elementOptions)
+			return self.Window:_createRadio(self, elementOptions)
 		end
 
 		tab.TabButton.MouseButton1Click:Connect(function()
@@ -4877,6 +4885,254 @@ return function(Toolkit, Veil)
 
 		registerTabControl(tab, cb)
 		return cb
+	end
+
+	-- ── Radio Button ─────────────────────────────────────────────────────────
+
+	local RadioDotSize = 8
+	local RadioCircleSize = 16
+	local RadioItemHeight = 26
+	local RadioAnimTime = 0.10
+
+	function Window:_createRadio(tab, options)
+		options = options or {}
+		local shouldPersist = options.Persist ~= false
+
+		local parentColumn = options.ColumnFrame or resolveTabColumn(tab, options.Column or options.Side or "left")
+		ensureColumnStack(parentColumn)
+
+		local items = options.Items or {}
+		local orientation = (options.Orientation or options.Direction or "Vertical"):lower()
+		local isHorizontal = orientation == "horizontal"
+		local defaultValue = options.Default or items[1]
+
+		local radio = {
+			Type = "Radio",
+			Name = options.Name or "Radio",
+			Value = defaultValue,
+			Items = items,
+			Orientation = orientation,
+			Disabled = options.Disabled == true,
+			Visible = options.Visible ~= false,
+			Callback = options.Callback,
+			ChangedSignal = Toolkit.Signal.new(),
+			Tab = tab,
+			Window = self,
+			ItemButtons = {},
+		}
+		if shouldPersist then
+			assignPersistKey(tab, radio, options, "Radio")
+		end
+
+		-- Label row at top
+		local labelHeight = (options.Name and options.Name ~= "") and 22 or 0
+		local itemCount = #items
+		local bodyHeight
+		if isHorizontal then
+			bodyHeight = RadioItemHeight
+		else
+			bodyHeight = itemCount * RadioItemHeight
+		end
+		local totalHeight = labelHeight + bodyHeight
+
+		radio.Holder = Veil.Instance:Create("Frame", {
+			Name = radio.Name,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			LayoutOrder = type(options.Order) == "number" and options.Order or nextOrder(parentColumn),
+			Size = UDim2.new(1, 0, 0, totalHeight),
+			Visible = radio.Visible,
+			Parent = parentColumn,
+		})
+
+		if labelHeight > 0 then
+			Veil.Instance:Create("TextLabel", {
+				Name = "Label",
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Font = Enum.Font.GothamMedium,
+				Position = UDim2.fromOffset(0, 0),
+				Size = UDim2.new(1, 0, 0, labelHeight),
+				Text = radio.Name,
+				TextColor3 = COLORS.Text,
+				TextSize = 14,
+				TextTransparency = 0,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				ZIndex = 5,
+				Parent = radio.Holder,
+			})
+		end
+
+		local body = Veil.Instance:Create("Frame", {
+			Name = "Body",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(0, labelHeight),
+			Size = UDim2.new(1, 0, 0, bodyHeight),
+			Parent = radio.Holder,
+		})
+
+		if isHorizontal then
+			Veil.Instance:Create("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				HorizontalAlignment = Enum.HorizontalAlignment.Left,
+				Padding = UDim.new(0, 12),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				Parent = body,
+			})
+		else
+			Veil.Instance:Create("UIListLayout", {
+				FillDirection = Enum.FillDirection.Vertical,
+				Padding = UDim.new(0, 0),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Parent = body,
+			})
+		end
+
+		local animTI = TweenInfo.new(RadioAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+		local function applySelected(selectedValue)
+			for _, item in ipairs(radio.ItemButtons) do
+				local isSelected = item.Value == selectedValue
+				TweenService:Create(item.Dot, animTI, {
+					BackgroundTransparency = isSelected and 0 or 1,
+				}):Play()
+				TweenService:Create(item.Circle, animTI, {
+					BackgroundTransparency = isSelected and 0.85 or 1,
+				}):Play()
+				TweenService:Create(item.CircleStroke, animTI, {
+					Transparency = isSelected and 0.55 or STROKE_TRANSPARENCY,
+					Color = isSelected and COLORS.Accent or COLORS.Stroke,
+				}):Play()
+				TweenService:Create(item.Label, animTI, {
+					TextTransparency = isSelected and 0 or 0.3,
+				}):Play()
+			end
+		end
+
+		for i, itemValue in ipairs(items) do
+			local itemStr = tostring(itemValue)
+
+			local itemWidth
+			if isHorizontal then
+				local textW = math.ceil(measureText(itemStr, 13, Enum.Font.Gotham).X)
+				itemWidth = RadioCircleSize + 6 + textW
+			end
+
+			local itemFrame = Veil.Instance:Create("Frame", {
+				Name = "Item_" .. itemStr,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				LayoutOrder = i,
+				Size = isHorizontal and UDim2.new(0, itemWidth, 1, 0) or UDim2.new(1, 0, 0, RadioItemHeight),
+				Parent = body,
+			})
+
+			local circle = Veil.Instance:Create("Frame", {
+				Name = "Circle",
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundColor3 = COLORS.Accent,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Position = UDim2.new(0, 0, 0.5, 0),
+				Size = UDim2.fromOffset(RadioCircleSize, RadioCircleSize),
+				ZIndex = 5,
+				Parent = itemFrame,
+			})
+			createCorner(circle, RadioCircleSize / 2)
+
+			local circleStroke = Veil.Instance:Create("UIStroke", {
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+				Color = COLORS.Stroke,
+				Transparency = STROKE_TRANSPARENCY,
+				Thickness = 1.5,
+				Parent = circle,
+			})
+
+			local dot = Veil.Instance:Create("Frame", {
+				Name = "Dot",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = COLORS.Accent,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(RadioDotSize, RadioDotSize),
+				ZIndex = 6,
+				Parent = circle,
+			})
+			createCorner(dot, RadioDotSize / 2)
+
+			local lbl = Veil.Instance:Create("TextLabel", {
+				Name = "Label",
+				AnchorPoint = Vector2.new(0, 0.5),
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Font = Enum.Font.Gotham,
+				Position = UDim2.fromOffset(RadioCircleSize + 6, 0),
+				Size = UDim2.new(1, -(RadioCircleSize + 6), 1, 0),
+				Text = itemStr,
+				TextColor3 = COLORS.Text,
+				TextSize = 13,
+				TextTransparency = 0.3,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Center,
+				ZIndex = 5,
+				Parent = itemFrame,
+			})
+
+			local btn = Veil.Instance:Create("TextButton", {
+				Name = "Hitbox",
+				AutoButtonColor = false,
+				BackgroundTransparency = 1,
+				BorderSizePixel = 0,
+				Size = UDim2.new(1, 0, 1, 0),
+				Text = "",
+				ZIndex = 7,
+				Parent = itemFrame,
+			})
+
+			local itemEntry = { Value = itemValue, Dot = dot, Circle = circle, CircleStroke = circleStroke, Label = lbl }
+			table.insert(radio.ItemButtons, itemEntry)
+
+			btn.MouseButton1Click:Connect(function()
+				if radio.Disabled then return end
+				radio.Value = itemValue
+				applySelected(itemValue)
+				if radio.Callback then pcall(radio.Callback, itemValue) end
+				radio.ChangedSignal:Fire(itemValue)
+			end)
+		end
+
+		applySelected(radio.Value)
+
+		function radio:Set(value)
+			self.Value = value
+			applySelected(value)
+		end
+
+		function radio:GetValue()
+			return self.Value
+		end
+
+		function radio:OnChanged(fn)
+			return self.ChangedSignal:Connect(fn)
+		end
+
+		function radio:SetVisible(visible)
+			self.Holder.Visible = visible ~= false
+		end
+
+		function radio:RefreshTheme()
+			for _, item in ipairs(self.ItemButtons) do
+				item.Label.TextColor3 = COLORS.Text
+				item.Dot.BackgroundColor3 = COLORS.Accent
+				item.Circle.BackgroundColor3 = COLORS.Accent
+			end
+		end
+
+		registerTabControl(tab, radio)
+		return radio
 	end
 
 	-- ── Normal Slider ────────────────────────────────────────────────────────
