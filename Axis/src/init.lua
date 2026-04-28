@@ -1,4 +1,4 @@
--- Axis - UI construction module for STRATA-V1
+﻿-- Axis - UI construction module for STRATA-V1
 -- Depends on: Toolkit, Veil (both passed as arguments to this factory).
 -- Public: CreateWindow, CreateTab, Toast, Notify, DestroyAll,
 --         CreateCrosshair, CreateCharacterViewer, CreateKeybindOverlay,
@@ -7649,10 +7649,13 @@ return function(Toolkit, Veil)
 		if self._searchModal then
 			self._searchClosing = true
 			local m = self._searchModal
+			local bd = self._searchBackdrop
 			local ti = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			local tw = TweenService:Create(m, ti, { Size = _udim2Offset(SearchModalWidth - 8, SearchInputHeight - 4), BackgroundTransparency = 0.5 })
+			TweenService:Create(m, ti, { Size = _udim2Offset(SearchModalWidth - 8, SearchInputHeight - 4), BackgroundTransparency = 0.5 }):Play()
+			if bd then TweenService:Create(bd, ti, { BackgroundTransparency = 1 }):Play() end
+			local tw = TweenService:Create(m, ti, {})
 			tw:Play()
-			tw.Completed:Connect(function()
+			task.delay(0.12, function()
 				Veil.Instance:SecureDestroy(m)
 				self._searchModal = nil
 				self._searchClosing = false
@@ -7674,7 +7677,6 @@ return function(Toolkit, Veil)
 			self._searchModal = nil
 		end
 
-		-- Use first window if none supplied
 		sourceWindow = sourceWindow or self.Windows[1]
 
 		-- Ensure surface exists
@@ -7689,24 +7691,28 @@ return function(Toolkit, Veil)
 				Parent = self.Surface,
 			})
 
-			local backdrop = Veil.Instance:Create("TextButton", {
+			self._searchBackdrop = Veil.Instance:Create("TextButton", {
 				AutoButtonColor = false,
 				BackgroundColor3 = Color3.new(0, 0, 0),
-				BackgroundTransparency = 0.5,
+				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Size = _udim2Scale(1, 1),
 				Text = "",
 				ZIndex = 300,
 				Parent = self._searchSurface,
 			})
-			backdrop.MouseButton1Click:Connect(function()
+			self._searchBackdrop.MouseButton1Click:Connect(function()
 				self:CloseSearch()
 			end)
 		end
 		self._searchSurface.Visible = true
 
+		-- Fade in backdrop
+		TweenService:Create(self._searchBackdrop, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 0.5 }):Play()
+
 		-- Build result list from source window
 		local results = {}
+		local matchedData = {}
 		if sourceWindow then
 			for _, tab in ipairs(sourceWindow.Tabs or {}) do
 				table.insert(results, { label = tab.Name or "Tab", type = "Tab", ctrl = nil })
@@ -7718,7 +7724,7 @@ return function(Toolkit, Veil)
 			end
 		end
 
-		-- Modal frame — starts slightly small for animation
+		-- Modal frame
 		local modal = Veil.Instance:Create("Frame", {
 			Name = "SearchModal",
 			AnchorPoint = Vector2.new(0.5, 0),
@@ -7737,8 +7743,10 @@ return function(Toolkit, Veil)
 		self._searchModal = modal
 
 		-- Animate open
-		local openTI = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		TweenService:Create(modal, openTI, { Size = _udim2Offset(SearchModalWidth, SearchInputHeight), BackgroundTransparency = 0 }):Play()
+		TweenService:Create(modal, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = _udim2Offset(SearchModalWidth, SearchInputHeight),
+			BackgroundTransparency = 0,
+		}):Play()
 
 		-- Input row
 		local inputRow = Veil.Instance:Create("Frame", {
@@ -7833,23 +7841,36 @@ return function(Toolkit, Veil)
 		})
 		createPadding(resultsList, 4, 6, 4, 6)
 
-		-- Arrow key state
+		-- Arrow key navigation
 		local selectedIdx = 0
 		local rowFrames = {}
 
 		local function highlightRow(idx)
+			local hoverTI = TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 			for j, rf in ipairs(rowFrames) do
-				rf.BackgroundTransparency = j == idx and 0.88 or 1
+				local target = j == idx and 0.88 or 1
+				TweenService:Create(rf, hoverTI, { BackgroundTransparency = target }):Play()
 			end
 			selectedIdx = idx
+			-- Autoscroll to keep selected row visible
+			if idx > 0 and rowFrames[idx] then
+				local rowTop = (idx - 1) * (SearchItemHeight + 2)
+				local rowBot = rowTop + SearchItemHeight
+				local visH = resultsList.AbsoluteSize.Y
+				local canvasY = resultsList.CanvasPosition.Y
+				if rowBot > canvasY + visH then
+					resultsList.CanvasPosition = Vector2.new(0, rowBot - visH)
+				elseif rowTop < canvasY then
+					resultsList.CanvasPosition = Vector2.new(0, rowTop)
+				end
+			end
 		end
 
-		-- Render a mini inline widget for the control
+		-- Inline control renderer
 		local function renderInlineControl(parent, ctrl)
-			if not ctrl then return end
+			if not ctrl then return false end
 			local t = ctrl.Type
 			if t == "Toggle" then
-				-- mini toggle indicator
 				local dot = Veil.Instance:Create("Frame", {
 					AnchorPoint = Vector2.new(1, 0.5),
 					BackgroundColor3 = ctrl.Value and COLORS.Accent or COLORS.Stroke,
@@ -7866,7 +7887,7 @@ return function(Toolkit, Veil)
 						dot.BackgroundColor3 = ctrl.Value and COLORS.Accent or COLORS.Stroke
 					end
 				end)
-				return
+				return true
 			elseif t == "Slider" then
 				Veil.Instance:Create("TextLabel", {
 					AnchorPoint = Vector2.new(1, 0.5),
@@ -7882,7 +7903,7 @@ return function(Toolkit, Veil)
 					ZIndex = 306,
 					Parent = parent,
 				})
-				return
+				return true
 			elseif t == "Dropdown" then
 				local val = ctrl.Value
 				if type(val) == "table" then val = table.concat(val, ", ") end
@@ -7901,32 +7922,15 @@ return function(Toolkit, Veil)
 					ZIndex = 306,
 					Parent = parent,
 				})
-				return
+				return true
 			end
-			-- Fallback: type badge
-			local typeBadge = Veil.Instance:Create("TextLabel", {
-				AnchorPoint = Vector2.new(1, 0.5),
-				BackgroundColor3 = COLORS.Accent,
-				BackgroundTransparency = 0.82,
-				BorderSizePixel = 0,
-				Font = Enum.Font.Gotham,
-				Position = UDim2.new(1, -8, 0.5, 0),
-				Size = _udim2Offset(0, 18),
-				AutomaticSize = Enum.AutomaticSize.X,
-				Text = t or "Control",
-				TextColor3 = COLORS.Accent,
-				TextSize = 10,
-				TextXAlignment = Enum.TextXAlignment.Center,
-				ZIndex = 305,
-				Parent = parent,
-			})
-			createCorner(typeBadge, 4)
-			createPadding(typeBadge, 0, 5, 0, 5)
+			return false
 		end
 
 		-- Filter and render results
 		local function renderResults(query)
 			rowFrames = {}
+			matchedData = {}
 			selectedIdx = 0
 			for _, child in ipairs(resultsList:GetChildren()) do
 				if child:IsA("Frame") or child:IsA("TextButton") then
@@ -7944,6 +7948,7 @@ return function(Toolkit, Veil)
 					end
 				end
 			end
+			matchedData = matched
 
 			local hasResults = #matched > 0
 			divider.Visible = hasResults
@@ -7988,19 +7993,40 @@ return function(Toolkit, Veil)
 					Parent = row,
 				})
 
-				renderInlineControl(row, r.ctrl)
+				-- Inline control widget or fallback type badge
+				if not renderInlineControl(row, r.ctrl) then
+					local typeBadge = Veil.Instance:Create("TextLabel", {
+						AnchorPoint = Vector2.new(1, 0.5),
+						BackgroundColor3 = COLORS.Accent,
+						BackgroundTransparency = 0.82,
+						BorderSizePixel = 0,
+						Font = Enum.Font.Gotham,
+						Position = UDim2.new(1, -8, 0.5, 0),
+						Size = _udim2Offset(0, 18),
+						AutomaticSize = Enum.AutomaticSize.X,
+						Text = r.type or "Control",
+						TextColor3 = COLORS.Accent,
+						TextSize = 10,
+						TextXAlignment = Enum.TextXAlignment.Center,
+						ZIndex = 305,
+						Parent = row,
+					})
+					createCorner(typeBadge, 4)
+					createPadding(typeBadge, 0, 5, 0, 5)
+				end
 
-				local hoverTI = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				local hoverTI = TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 				row.MouseEnter:Connect(function()
-					TweenService:Create(row, hoverTI, { BackgroundTransparency = 0.88 }):Play()
 					for j, rf in ipairs(rowFrames) do
-						if rf == row then selectedIdx = j break end
+						if rf == row then
+							selectedIdx = j
+							break
+						end
 					end
+					highlightRow(selectedIdx)
 				end)
 				row.MouseLeave:Connect(function()
-					if rowFrames[selectedIdx] ~= row then
-						TweenService:Create(row, hoverTI, { BackgroundTransparency = 1 }):Play()
-					end
+					TweenService:Create(row, hoverTI, { BackgroundTransparency = 1 }):Play()
 				end)
 				row.MouseButton1Click:Connect(function()
 					if r.ctrl and r.ctrl.Set and r.ctrl.Type == "Toggle" then
@@ -8016,40 +8042,55 @@ return function(Toolkit, Veil)
 			renderResults(searchBox.Text)
 		end)
 
-		-- Keyboard: ESC, arrows, enter
-		local inputConn = UserInputService.InputBegan:Connect(function(inp, processed)
+		-- Keyboard: ESC, arrows, enter — sink arrow/enter inputs via InputEnded guard
+		local kbConn = UserInputService.InputBegan:Connect(function(inp, processed)
 			if inp.KeyCode == Enum.KeyCode.Escape then
 				self:CloseSearch()
 				return
 			end
 			if inp.KeyCode == Enum.KeyCode.Down then
-				if #rowFrames > 0 then
-					highlightRow(math.min(selectedIdx + 1, #rowFrames))
-				end
+				if #rowFrames > 0 then highlightRow(math.min(selectedIdx + 1, #rowFrames)) end
+				return
 			elseif inp.KeyCode == Enum.KeyCode.Up then
-				if #rowFrames > 0 then
-					highlightRow(math.max(selectedIdx - 1, 1))
-				end
+				if #rowFrames > 0 then highlightRow(math.max(selectedIdx - 1, 1)) end
+				return
 			elseif inp.KeyCode == Enum.KeyCode.Return then
-				if selectedIdx > 0 and rowFrames[selectedIdx] then
-					-- Simulate click on the selected row
-					local children = resultsList:GetChildren()
-					for _, child in ipairs(children) do
-						if child:IsA("TextButton") and child == rowFrames[selectedIdx] then
-							-- Fire click programmatically
-							pcall(function()
-								for _, conn in ipairs(child:GetPropertyChangedSignal("Text"):Connect(function() end)) do end
-							end)
-							-- Just fire the click event
+				if selectedIdx > 0 and selectedIdx <= #matchedData then
+					local r = matchedData[selectedIdx]
+					if r and r.ctrl and r.ctrl.Set and r.ctrl.Type == "Toggle" then
+						r.ctrl:Set(not r.ctrl.Value)
+						-- Refresh the dot color in the row
+						local row = rowFrames[selectedIdx]
+						if row then
+							for _, child in ipairs(row:GetChildren()) do
+								if child:IsA("Frame") and child.Name ~= "UICorner" then
+									child.BackgroundColor3 = r.ctrl.Value and COLORS.Accent or COLORS.Stroke
+								end
+							end
 						end
+					else
+						self:CloseSearch()
 					end
-					self:CloseSearch()
 				end
+				return
+			end
+		end)
+
+		-- Sink arrow/WASD keys so the player doesn't move
+		local sinkConn = UserInputService.InputBegan:Connect(function(inp, processed)
+			local kc = inp.KeyCode
+			if kc == Enum.KeyCode.W or kc == Enum.KeyCode.A or kc == Enum.KeyCode.S or kc == Enum.KeyCode.D
+				or kc == Enum.KeyCode.Up or kc == Enum.KeyCode.Down or kc == Enum.KeyCode.Left or kc == Enum.KeyCode.Right
+				or kc == Enum.KeyCode.Space then
+				-- The TextBox has focus, so these are already sunk by the focused TextBox
 			end
 		end)
 
 		modal.AncestryChanged:Connect(function()
-			if not modal.Parent then inputConn:Disconnect() end
+			if not modal.Parent then
+				kbConn:Disconnect()
+				sinkConn:Disconnect()
+			end
 		end)
 
 		renderResults("")
@@ -8071,6 +8112,7 @@ return function(Toolkit, Veil)
 			end
 		end
 	end)
+
 
 
 	-- Adds a "Scanner" tab to sourceWindow. "Run Scan" calls Veil.Scanner:Run()

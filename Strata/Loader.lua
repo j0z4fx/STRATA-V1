@@ -10,6 +10,7 @@ local UPDATE_VALUE_URL = RAW_BASE_URL .. "/Strata/build.txt"
 local TOOLKIT_URL = BASE_URL .. "/Toolkit/src/init.lua"
 local VEIL_URL = BASE_URL .. "/Veil/src/init.lua"
 local AXIS_URL = BASE_URL .. "/Axis/src/init.lua"
+local INSIGHT_URL = BASE_URL .. "/Insight/src/init.lua"
 local LOAD_COMPLETE_SOUND = BASE_URL .. "/Axis/Sounds/LoadComplete.mp3"
 
 local Players = game:GetService("Players")
@@ -490,6 +491,24 @@ local steps = {
 	},
 
 	{
+		Text = "Loading Insight...",
+		Error = "[Strata Loader] Failed to load Insight",
+		Run = function()
+			local source = Fetch(INSIGHT_URL)
+			local compiled, compileErr = loadstring(source)
+			if not compiled then
+				error("Compile error: " .. tostring(compileErr), 0)
+			end
+			local loaded = compiled()
+			if type(loaded) == "function" then
+				context.Insight = loaded(context.Toolkit, context.Veil)
+			else
+				context.Insight = loaded
+			end
+		end,
+	},
+
+	{
 		Text = "Axis: building interface",
 		Error = "[Strata Loader] Failed to initialize Axis shell",
 		Run = function()
@@ -663,6 +682,7 @@ local steps = {
 			context.Axis:CreateTab({
 				Name = "Profile",
 				Icon = "user-round",
+				ShowCharacterViewer = true,
 			})
 
 			local settingsTab = context.Axis:CreateTab({
@@ -675,6 +695,30 @@ local steps = {
 			local settingsLeft = settingsTab.Columns.leftColumn
 			local settingsMiddle = settingsTab.Columns.middleColumn
 			local settingsRight = settingsTab.Columns.rightColumn
+
+			settingsLeft:SectionHeader("Utility")
+
+			settingsLeft:CreateToggle({
+				Text = "Anti-AFK",
+				Subtext = "Prevents idle disconnect",
+				Default = false,
+				PersistKey = "Settings.AntiAFK",
+				Callback = function(value)
+					context.Axis:SetAntiAFK(value)
+				end,
+			})
+
+			if context.Insight then
+				settingsLeft:CreateToggle({
+					Text = "Player ESP",
+					Subtext = "Show boxes and names",
+					Default = false,
+					PersistKey = "Settings.PlayerESP",
+					Callback = function(value)
+						if value then context.Insight:Enable() else context.Insight:Disable() end
+					end,
+				})
+			end
 
 			settingsLeft:SectionHeader("Interface")
 
@@ -778,6 +822,43 @@ local steps = {
 
 			syncThemePickers()
 			themeManager.Refresh()
+		end,
+	},
+
+	{
+		Text = "Axis: registering features",
+		Error = "[Strata Loader] Failed to register features",
+		Run = function()
+			-- Crosshair system
+			pcall(function()
+				context.Axis:CreateCrosshair(context.Window, {
+					Color = Color3.fromRGB(255, 255, 255),
+					Width = 2,
+					Length = 8,
+					Gap = 3,
+					Opacity = 1,
+				})
+			end)
+
+			-- Character viewer
+			pcall(function()
+				context.Axis:CreateCharacterViewer(context.Window)
+			end)
+
+			-- Security scanner
+			pcall(function()
+				context.Axis:CreateScanner(context.Window)
+			end)
+
+			-- Keybind overlay
+			pcall(function()
+				context.Axis:CreateKeybindOverlay({
+					Title = "Keybinds",
+					Keybind = Enum.KeyCode.RightAlt,
+					Position = "BottomRight",
+					Binds = {},
+				})
+			end)
 		end,
 	},
 
