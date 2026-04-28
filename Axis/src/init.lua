@@ -237,6 +237,8 @@ return function(Toolkit, Veil)
 		house = "house-line",
 		["user-round"] = "user-circle",
 		settings = "gear-six",
+		search = "magnifying-glass",
+		["shield-alert"] = "shield-warning",
 	}
 	local function getPhosphorNameCandidates(semantic)
 		local key = string.lower(semantic)
@@ -7638,9 +7640,9 @@ return function(Toolkit, Veil)
 	-- ── Search Modal ─────────────────────────────────────────────────────────
 
 	local SearchModalWidth = 480
-	local SearchModalMaxHeight = 360
-	local SearchInputHeight = 52
-	local SearchItemHeight = 36
+	local SearchModalMaxHeight = 320
+	local SearchInputHeight = 38
+	local SearchItemHeight = 32
 
 	function Axis:CloseSearch()
 		if self._searchModal then
@@ -7705,7 +7707,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
 			Position = _udim2Scale(0.5, 0.4),
-			Size = _udim2Offset(SearchModalWidth, SearchInputHeight + 8),
+			Size = _udim2Offset(SearchModalWidth, SearchInputHeight),
 			AutomaticSize = Enum.AutomaticSize.None,
 			ZIndex = 302,
 			Parent = self._searchSurface,
@@ -7730,7 +7732,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = UDim2.new(0, 14, 0.5, 0),
-			Size = _udim2Offset(18, 18),
+			Size = _udim2Offset(16, 16),
 			ScaleType = Enum.ScaleType.Fit,
 			ImageColor3 = COLORS.Text,
 			ImageTransparency = 0.4,
@@ -7757,17 +7759,19 @@ return function(Toolkit, Veil)
 			Font = Enum.Font.GothamMedium,
 			PlaceholderColor3 = COLORS.Text,
 			PlaceholderText = "Start typing…",
-			Position = UDim2.new(0, 40, 0.5, 0),
-			Size = UDim2.new(1, -54, 0, 24),
+			Position = UDim2.new(0, 36, 0.5, 0),
+			Size = UDim2.new(1, -48, 0, 20),
 			Text = "",
 			TextColor3 = COLORS.Text,
-			TextSize = 15,
+			TextSize = 13,
 			TextTransparency = 0,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			ZIndex = 304,
 			Parent = inputRow,
 		})
-		self:_applySelectionHighlight(searchBox)
+		if sourceWindow and sourceWindow._applySelectionHighlight then
+			sourceWindow:_applySelectionHighlight(searchBox)
+		end
 
 		-- Divider
 		local divider = Veil.Instance:Create("Frame", {
@@ -7817,9 +7821,7 @@ return function(Toolkit, Veil)
 			local q = query:lower():gsub("^%s+", ""):gsub("%s+$", "")
 			local matched = {}
 			if q == "" then
-				for i = 1, math.min(8, #results) do
-					table.insert(matched, results[i])
-				end
+				-- show nothing until user types
 			else
 				for _, r in ipairs(results) do
 					if r.label:lower():find(q, 1, true) then
@@ -7914,12 +7916,11 @@ return function(Toolkit, Veil)
 			if not modal.Parent then escConn:Disconnect() end
 		end)
 
-		-- Initial results
+		-- Initial state: just input, no results
 		renderResults("")
 
-		-- Auto-focus
-		task.spawn(function()
-			RunService.Heartbeat:Wait()
+		-- Auto-focus the text box immediately
+		task.defer(function()
 			if searchBox and searchBox.Parent then
 				searchBox:CaptureFocus()
 			end
