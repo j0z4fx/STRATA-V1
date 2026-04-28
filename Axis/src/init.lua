@@ -7944,7 +7944,7 @@ return function(Toolkit, Veil)
 			Callback = function()
 				local results, err = Veil.Scanner:Run()
 				if not results then
-					statusLabel.SetSubtext and statusLabel:SetSubtext("Error: " .. tostring(err))
+					if statusLabel.SetSubtext then statusLabel:SetSubtext("Error: " .. tostring(err)) end
 					self:Notify({ Title = "Scanner", Message = tostring(err), Type = "Error" })
 					return
 				end
