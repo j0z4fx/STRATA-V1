@@ -856,7 +856,14 @@ local steps = {
 					Title = "Keybinds",
 					Keybind = Enum.KeyCode.RightAlt,
 					Position = "BottomRight",
-					Binds = {},
+					Binds = {
+						{ Name = "Aimbot",       Key = "[V]",        Active = true  },
+						{ Name = "BHop",         Key = "[Backspace]", Active = true  },
+						{ Name = "Fly",          Key = "[G]",        Active = false },
+						{ Name = "Silent Aim",   Key = "[Z]",        Active = true  },
+						{ Name = "Auto Shoot",   Key = "[H]",        Active = false },
+						{ Name = "Third Person", Key = "[N]",        Active = true  },
+					},
 				})
 			end)
 		end,

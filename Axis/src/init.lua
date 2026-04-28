@@ -1,4 +1,4 @@
-﻿-- Axis - UI construction module for STRATA-V1
+-- Axis - UI construction module for STRATA-V1
 -- Depends on: Toolkit, Veil (both passed as arguments to this factory).
 -- Public: CreateWindow, CreateTab, Toast, Notify, DestroyAll,
 --         CreateCrosshair, CreateCharacterViewer, CreateKeybindOverlay,
