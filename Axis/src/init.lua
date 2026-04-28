@@ -7513,12 +7513,11 @@ return function(Toolkit, Veil)
 
 	-- ── Keybind Overlay ──────────────────────────────────────────────────────
 	-- Standalone reference panel independent of the main window visibility.
-	-- options: {Title?, Keybind (KeyCode), Position ("BottomRight"|etc), Binds[]}
-	-- Binds entry: {Name, Key (string label), Active (bool for highlight)}
+	-- Dynamically shows all toggles that are ON and have a keypicker bound.
+	-- options: {Title?, Keybind (KeyCode), Position ("BottomRight"|etc)}
 
 	function Axis:CreateKeybindOverlay(options)
 		options = options or {}
-		local binds = options.Binds or options.Keys or {}
 		local toggleKey = options.Keybind or options.ToggleKey or Enum.KeyCode.RightAlt
 		local positionMode = options.Position or "BottomRight"
 		local visible = options.Visible ~= false
@@ -7527,7 +7526,7 @@ return function(Toolkit, Veil)
 		local rowHeight = 28
 		local padH = 10
 		local padV = 8
-		local panelHeight = padV * 2 + #binds * rowHeight
+		local headerHeight = padV + 16
 
 		local panel = Veil.Instance:Create("Frame", {
 			Name = "KeybindOverlay",
@@ -7541,7 +7540,7 @@ return function(Toolkit, Veil)
 				or positionMode == "BottomLeft" and UDim2.new(0, 16, 1, -16)
 				or positionMode == "TopRight" and UDim2.new(1, -16, 0, 16)
 				or UDim2.new(0, 16, 0, 16),
-			Size = _udim2Offset(panelWidth, panelHeight),
+			Size = _udim2Offset(panelWidth, headerHeight + rowHeight + padV),
 			Visible = visible,
 			ZIndex = 190,
 			Parent = self.Surface,
@@ -7549,7 +7548,6 @@ return function(Toolkit, Veil)
 		createCorner(panel, 10)
 		createBorder(panel)
 
-		-- Header
 		Veil.Instance:Create("TextLabel", {
 			AnchorPoint = Vector2.new(0, 0),
 			BackgroundTransparency = 1,
@@ -7566,48 +7564,151 @@ return function(Toolkit, Veil)
 			Parent = panel,
 		})
 
-		for i, bind in ipairs(binds) do
-			local y = padV + (i - 1) * rowHeight + 14
+		-- Dynamic rows container
+		local rowsFrame = Veil.Instance:Create("Frame", {
+			Name = "Rows",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = _udim2Offset(0, headerHeight),
+			Size = _udim2Offset(panelWidth, 0),
+			ZIndex = 191,
+			Parent = panel,
+		})
+		Veil.Instance:Create("UIListLayout", {
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Parent = rowsFrame,
+		})
 
-			Veil.Instance:Create("TextLabel", {
-				AnchorPoint = Vector2.new(0, 0),
-				BackgroundTransparency = 1,
-				BorderSizePixel = 0,
-				Font = Enum.Font.GothamMedium,
-				Position = _udim2Offset(padH, y),
-				Size = UDim2.new(0.65, -padH, 0, rowHeight),
-				Text = bind.Name or bind.Action or "Action",
-				TextColor3 = bind.Active ~= false and COLORS.Accent or COLORS.Text,
-				TextSize = 12,
-				TextTransparency = bind.Active == false and 0.5 or 0,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				TextYAlignment = Enum.TextYAlignment.Center,
-				ZIndex = 191,
-				Parent = panel,
-			})
+		-- Empty state (sibling of rowsFrame, not in UIListLayout)
+		local emptyLabel = Veil.Instance:Create("TextLabel", {
+			AnchorPoint = Vector2.new(0.5, 0),
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.Gotham,
+			Position = UDim2.new(0.5, 0, 0, headerHeight),
+			Size = _udim2Offset(panelWidth - padH * 2, rowHeight),
+			Text = "No active keybinds",
+			TextColor3 = COLORS.Text,
+			TextSize = 11,
+			TextTransparency = 0.6,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Visible = true,
+			ZIndex = 191,
+			Parent = panel,
+		})
 
-			local keyBadge = Veil.Instance:Create("TextLabel", {
-				AnchorPoint = Vector2.new(1, 0.5),
-				BackgroundColor3 = COLORS.Stroke,
-				BackgroundTransparency = 0.88,
-				BorderSizePixel = 0,
-				Font = Enum.Font.GothamMedium,
-				Position = UDim2.new(1, -padH, 0, y + rowHeight / 2),
-				Size = _udim2Offset(0, 18),
-				AutomaticSize = Enum.AutomaticSize.X,
-				Text = bind.Key or bind.KeyCode or "?",
-				TextColor3 = COLORS.Text,
-				TextSize = 10,
-				TextTransparency = bind.Active == false and 0.5 or 0.2,
-				TextXAlignment = Enum.TextXAlignment.Center,
-				ZIndex = 191,
-				Parent = panel,
-			})
-			createCorner(keyBadge, 4)
-			createPadding(keyBadge, 0, 5, 0, 5)
+		local connected = {}
+		local rowInstances = {}
+
+		local function rebuild()
+			for _, inst in ipairs(rowInstances) do
+				Veil.Instance:SecureDestroy(inst)
+			end
+			rowInstances = {}
+
+			local activeBinds = {}
+			for _, window in ipairs(self.Windows) do
+				for _, tab in ipairs(window.Tabs or {}) do
+					for _, toggle in ipairs(tab.ToggleControls or {}) do
+						local kp = toggle.Keypicker
+						if toggle.Value and kp and kp.Value and kp.Value ~= "None" then
+							table.insert(activeBinds, {
+								name = toggle.Name or toggle.Text or "?",
+								key = kp.Value,
+							})
+						end
+					end
+				end
+			end
+
+			local isEmpty = #activeBinds == 0
+			emptyLabel.Visible = isEmpty
+
+			for i, bind in ipairs(activeBinds) do
+				local row = Veil.Instance:Create("Frame", {
+					BackgroundTransparency = 1,
+					BorderSizePixel = 0,
+					LayoutOrder = i,
+					Size = _udim2Offset(panelWidth, rowHeight),
+					ZIndex = 191,
+					Parent = rowsFrame,
+				})
+				table.insert(rowInstances, row)
+
+				Veil.Instance:Create("TextLabel", {
+					AnchorPoint = Vector2.new(0, 0.5),
+					BackgroundTransparency = 1,
+					BorderSizePixel = 0,
+					Font = Enum.Font.GothamMedium,
+					Position = UDim2.new(0, padH, 0.5, 0),
+					Size = UDim2.new(0.65, -padH, 0, rowHeight),
+					Text = bind.name,
+					TextColor3 = COLORS.Accent,
+					TextSize = 12,
+					TextTransparency = 0,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Center,
+					ZIndex = 192,
+					Parent = row,
+				})
+
+				local keyBadge = Veil.Instance:Create("TextLabel", {
+					AnchorPoint = Vector2.new(1, 0.5),
+					BackgroundColor3 = COLORS.Stroke,
+					BackgroundTransparency = 0.88,
+					BorderSizePixel = 0,
+					Font = Enum.Font.GothamMedium,
+					Position = UDim2.new(1, -padH, 0.5, 0),
+					Size = _udim2Offset(0, 18),
+					AutomaticSize = Enum.AutomaticSize.X,
+					Text = "[" .. bind.key .. "]",
+					TextColor3 = COLORS.Text,
+					TextSize = 10,
+					TextTransparency = 0.2,
+					TextXAlignment = Enum.TextXAlignment.Center,
+					ZIndex = 192,
+					Parent = row,
+				})
+				createCorner(keyBadge, 4)
+				createPadding(keyBadge, 0, 5, 0, 5)
+			end
+
+			local visRows = isEmpty and 1 or #activeBinds
+			rowsFrame.Size = _udim2Offset(panelWidth, isEmpty and 0 or #activeBinds * rowHeight)
+			panel.Size = _udim2Offset(panelWidth, headerHeight + visRows * rowHeight + padV)
 		end
 
-		-- Toggle keybind
+		local function connectToggle(toggle)
+			if connected[toggle] then return end
+			connected[toggle] = true
+			toggle.ChangedSignal:Connect(rebuild)
+			if toggle.Keypicker then
+				toggle.Keypicker.ChangedSignal:Connect(rebuild)
+			end
+		end
+
+		local function scanTogles()
+			for _, window in ipairs(self.Windows) do
+				for _, tab in ipairs(window.Tabs or {}) do
+					for _, toggle in ipairs(tab.ToggleControls or {}) do
+						connectToggle(toggle)
+					end
+				end
+			end
+		end
+
+		-- Periodic re-scan for toggles added after overlay creation
+		local scanTick = 0
+		local scanConn = RunService.Heartbeat:Connect(function(dt)
+			scanTick = scanTick + dt
+			if scanTick < 2 then return end
+			scanTick = 0
+			scanTogles()
+		end)
+
+		scanTogles()
+		rebuild()
+
 		local overlay = {
 			Panel = panel,
 			Visible = visible,
@@ -7623,14 +7724,19 @@ return function(Toolkit, Veil)
 		end)
 
 		panel.AncestryChanged:Connect(function()
-			if not panel.Parent then conn:Disconnect() end
+			if not panel.Parent then
+				conn:Disconnect()
+				scanConn:Disconnect()
+			end
 		end)
 
 		function overlay:Show() self.Visible = true; panel.Visible = true end
 		function overlay:Hide() self.Visible = false; panel.Visible = false end
 		function overlay:Toggle() if self.Visible then self:Hide() else self:Show() end end
+		function overlay:Refresh() scanTogles(); rebuild() end
 		function overlay:Destroy()
 			conn:Disconnect()
+			scanConn:Disconnect()
 			Veil.Instance:SecureDestroy(panel)
 		end
 
