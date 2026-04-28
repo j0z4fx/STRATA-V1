@@ -1,9 +1,9 @@
--- Axis — UI construction module for STRATA-V1
+-- Axis - UI construction module for STRATA-V1
 -- Depends on: Toolkit, Veil (both passed as arguments to this factory).
 -- Public: CreateWindow, CreateTab, Toast, Notify, DestroyAll,
 --         CreateCrosshair, CreateCharacterViewer, CreateKeybindOverlay,
 --         CreateScanner, SetAntiAFK, Get/SetTheme, Get/SetIconPack
--- Never parents directly to CoreGui/PlayerGui/gethui — all surfaces via Veil.
+-- Never parents directly to CoreGui/PlayerGui/gethui - all surfaces via Veil.
 -- Executor compat: polyfills table.find/clear/clone and UDim2.fromOffset/Scale.
 
 return function(Toolkit, Veil)
@@ -2214,7 +2214,7 @@ return function(Toolkit, Veil)
 		local columnMode = options.ColumnMode or (tab.IsSettings and "Triple" or "Triple")
 		tab.leftColumn, tab.middleColumn, tab.rightColumn = createColumns(self, tab, tab.Content, columnMode)
 
-		-- Column API — all methods accept an options table and return a control object.
+		-- Column API - all methods accept an options table and return a control object.
 		-- Common options across all controls:
 		--   Name (string), Subtext (string), Default (initial value), Callback (fn)
 		-- Control objects expose :Set(value) and :GetValue() unless noted otherwise.
@@ -3495,9 +3495,9 @@ return function(Toolkit, Veil)
 		return colorpicker
 	end
 
-	-- Toggle — on/off switch with optional tooltip accessory.
+	-- Toggle - on/off switch with optional tooltip accessory.
 	-- options: {Name, Subtext?, Default (bool), Callback(bool)?, Persist?}
-	-- Returned control: :Set(bool), :GetValue()→bool
+	-- Returned control: :Set(bool), :GetValue()->bool
 	function Window:_createToggle(tab, options)
 		options = options or {}
 		local shouldPersist = options.Persist ~= false
@@ -3971,7 +3971,7 @@ return function(Toolkit, Veil)
 
 	-- ── Dropdown ─────────────────────────────────────────────────────────────
 
-	-- Dropdown — single or multi-select with optional search filter.
+	-- Dropdown - single or multi-select with optional search filter.
 	-- options: {Name, Items (string[]), Default (string|string[]), MultiSelect?,
 	--           Searchable?, Callback(value|values)?}
 	-- Multi Default must be a table; Callback receives string[] when MultiSelect=true.
@@ -4295,7 +4295,7 @@ return function(Toolkit, Veil)
 				local direction = self.Window:_positionDropdownPanel(self.Holder, self.Panel, h)
 				self._openDirection = direction
 				local finalPos = self.Panel.Position
-				-- Slide from opposite side: below→slide down from above; above→slide up from below
+				-- Slide from opposite side: below->slide down from above; above->slide up from below
 				local slideY = direction == "above" and DropdownAnimSlide or -DropdownAnimSlide
 				self.Panel.Position = _udim2Offset(
 					finalPos.X.Offset,
@@ -4323,7 +4323,7 @@ return function(Toolkit, Veil)
 			if self.Panel and self.Panel:GetAttribute("AxisOpen") then
 				self.Panel:SetAttribute("AxisOpen", false)
 				local currentPos = self.Panel.Position
-				-- Slide out toward origin: below→slide up; above→slide down
+				-- Slide out toward origin: below->slide up; above->slide down
 				local slideY = self._openDirection == "above" and DropdownAnimSlide or -DropdownAnimSlide
 				local finalPos = _udim2Offset(currentPos.X.Offset, currentPos.Y.Offset + slideY)
 				
@@ -4507,10 +4507,10 @@ return function(Toolkit, Veil)
 	end
 
 	-- ── Input / SecureInput ───────────────────────────────────────────────────
-	-- Input: options: {Name, Placeholder?, Default?, MaxLength?, Validator(v)→bool?,
+	-- Input: options: {Name, Placeholder?, Default?, MaxLength?, Validator(v)->bool?,
 	--                  Callback(value)?}
 	-- Validator receives the raw string; red stroke shown on false, no callback fired.
-	-- SecureInput: same API but TextBox.Text is always masked as bullets (•).
+	-- SecureInput: same API but TextBox.Text is always masked as bullets (*).
 	-- Real value is stored internally and passed unmasked to Callback.
 
 	function Window:_createInput(tab, options)
@@ -4714,7 +4714,7 @@ return function(Toolkit, Veil)
 
 	-- ── Secure Input ─────────────────────────────────────────────────────────
 
-	local BULLET = "•"
+	local BULLET = "*"
 
 	function Window:_createSecureInput(tab, options)
 		options = options or {}
@@ -6280,7 +6280,7 @@ return function(Toolkit, Veil)
 		slider.TitleLabel, slider.ValueLabel, slider.SubtextLabel =
 			buildSliderTextRows(slider.Holder, slider.Name, subtext, hasSubtext)
 
-		-- Track zone (no single thumb from buildSliderTrack — build manually for two thumbs)
+		-- Track zone (no single thumb from buildSliderTrack - build manually for two thumbs)
 		slider.TrackZone = Veil.Instance:Create("Frame", {
 			Name = "TrackZone",
 			BackgroundTransparency = 1,
@@ -6373,7 +6373,7 @@ return function(Toolkit, Veil)
 		local function formatRange(lo, hi)
 			local fmtLo = formatSliderValue(lo, step)
 			local fmtHi = formatSliderValue(hi, step)
-			return fmtLo .. " – " .. fmtHi
+			return fmtLo .. " - " .. fmtHi
 		end
 
 		function slider:_refreshTrack()
@@ -7928,7 +7928,7 @@ return function(Toolkit, Veil)
 
 	-- Adds a "Scanner" tab to sourceWindow. "Run Scan" calls Veil.Scanner:Run()
 	-- and populates results with name, path, reason, Copy and Kill buttons.
-	-- Scanner logic lives in Veil — Axis only presents results.
+	-- Scanner logic lives in Veil - Axis only presents results.
 	function Axis:CreateScanner(sourceWindow)
 		assert(sourceWindow, "[Axis] CreateScanner requires a window")
 
@@ -8092,7 +8092,7 @@ return function(Toolkit, Veil)
 								row.BackgroundColor3 = Color3.fromRGB(30, 22, 22)
 								self:Notify({ Title = "Scanner", Message = "Killed: " .. tostring(result.Name), Duration = 3 })
 							else
-								self:Notify({ Title = "Scanner", Message = "No script ref — cannot kill closure", Type = "Warning", Duration = 2 })
+								self:Notify({ Title = "Scanner", Message = "No script ref - cannot kill closure", Type = "Warning", Duration = 2 })
 							end
 						end)
 					end

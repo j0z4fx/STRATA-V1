@@ -1,8 +1,8 @@
--- Insight — player ESP module for STRATA-V1
+-- Insight - player ESP module for STRATA-V1
 -- Depends on: Toolkit, Veil (both passed as arguments to this factory).
 -- Loadable via: loadstring(game:HttpGet(url))()(Toolkit, Veil)
 -- Public: Enable(), Disable(), Configure(options)
--- All rendering goes through Veil.GUI:CreateSurface — no direct Instance.new.
+-- All rendering goes through Veil.GUI:CreateSurface - no direct Instance.new.
 -- All service access goes through Veil.Services:Get.
 -- Architecture: per-player ESP objects with Update/Remove methods updated on Heartbeat.
 return function(Toolkit, Veil)
@@ -30,7 +30,7 @@ return function(Toolkit, Veil)
 	local _state = {
 		Active      = false,
 		Surface     = nil,
-		ESPObjects  = {},   -- [Player] → esp object
+		ESPObjects  = {},   -- [Player] -> esp object
 		HBConn      = nil,
 		AddedConn   = nil,
 		RemovedConn = nil,
@@ -38,9 +38,9 @@ return function(Toolkit, Veil)
 
 	-- AABB half-extents used for 8-corner screen projection. Tuned for R6 rigs;
 	-- adjust HALF_H for taller/shorter characters or different rig types.
-	local HALF_H = 3.0   -- HumanoidRootPart → top of head (R6)
-	local HALF_W = 1.0   -- HRP → left/right
-	local HALF_D = 0.6   -- HRP → front/back (kept narrow for tighter box fit)
+	local HALF_H = 3.0   -- HumanoidRootPart -> top of head (R6)
+	local HALF_W = 1.0   -- HRP -> left/right
+	local HALF_D = 0.6   -- HRP -> front/back (kept narrow for tighter box fit)
 	local NAME_Y_OFFSET = -18
 	local DIST_Y_OFFSET = 4
 
@@ -288,7 +288,7 @@ return function(Toolkit, Veil)
 		end
 	end
 
-	-- Protect public API: wrap Lua closures → C closures, lock metatable.
+	-- Protect public API: wrap Lua closures -> C closures, lock metatable.
 	local function _wrapIfLua(fn)
 		if type(newcclosure) ~= "function" then return fn end
 		local ok, w = pcall(newcclosure, fn)

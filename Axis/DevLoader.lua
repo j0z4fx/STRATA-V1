@@ -3,10 +3,20 @@ local VEIL_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main/Veil/s
 local AXIS_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main/Axis/src/init.lua"
 local INSIGHT_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main/Insight/src/init.lua"
 
-local Toolkit = loadstring(game:HttpGet(TOOLKIT_URL))()
-local Veil = loadstring(game:HttpGet(VEIL_URL))()(Toolkit)
-local Axis = loadstring(game:HttpGet(AXIS_URL))()(Toolkit, Veil)
-local Insight = loadstring(game:HttpGet(INSIGHT_URL))()(Toolkit, Veil)
+-- safeLoad: wraps loadstring so compile errors surface with the module name
+-- instead of the opaque "attempt to call a nil value" from nil().
+local function safeLoad(source, name)
+	local compiled, err = loadstring(source)
+	if not compiled then
+		error("[DevLoader] " .. name .. " compile error: " .. tostring(err), 0)
+	end
+	return compiled
+end
+
+local Toolkit = safeLoad(game:HttpGet(TOOLKIT_URL), "Toolkit")()
+local Veil    = safeLoad(game:HttpGet(VEIL_URL),    "Veil")()(Toolkit)
+local Axis    = safeLoad(game:HttpGet(AXIS_URL),    "Axis")()(Toolkit, Veil)
+local Insight = safeLoad(game:HttpGet(INSIGHT_URL), "Insight")()(Toolkit, Veil)
 
 local window = Axis:CreateWindow({})
 

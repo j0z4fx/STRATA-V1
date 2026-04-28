@@ -1,4 +1,4 @@
--- Veil — protection and runtime authority for STRATA-V1
+-- Veil - protection and runtime authority for STRATA-V1
 -- Depends on: Toolkit (passed as first argument to this factory).
 -- Public: Services, Protection, Instance, GUI, Hooks, Env, Security,
 --         Sound, Scanner, Protect()
@@ -124,7 +124,7 @@ return function(Toolkit)
 
 	-- ── InstanceControl ───────────────────────────────────────────────────────────
 	-- Veil's Instance.new proxy. Randomises instance names to avoid enumeration.
-	-- _retireKey in Create() options destroys any existing sibling with that key —
+	-- _retireKey in Create() options destroys any existing sibling with that key -
 	-- prevents duplicate ScreenGuis on re-load.
 
 	local InstanceControl = {}
@@ -255,7 +255,7 @@ return function(Toolkit)
 
 	-- ── GUI ───────────────────────────────────────────────────────────────────────
 	-- Overlay and surface manager. ResolveParent priority:
-	--   gethui → protectgui+CoreGui → bare CoreGui → PlayerGui
+	--   gethui -> protectgui+CoreGui -> bare CoreGui -> PlayerGui
 	-- CreateRoot: permanent main window ScreenGui (call once per session).
 	-- CreateSurface: ephemeral overlay ScreenGui (destroy when feature disabled).
 
@@ -839,7 +839,7 @@ return function(Toolkit)
 		local results = {}
 		local seen = {}
 
-		-- GC closure scan — check string constants for suspicious patterns
+		-- GC closure scan - check string constants for suspicious patterns
 		if type(islclosure) == "function" then
 			for _, obj in ipairs(_safeGCFunctions()) do
 				if type(obj) == "function" and not seen[obj] then

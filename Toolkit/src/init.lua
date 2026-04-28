@@ -1,4 +1,4 @@
--- Toolkit — core infrastructure for STRATA-V1
+-- Toolkit - core infrastructure for STRATA-V1
 -- No dependencies. Instantiated once; all modules share the same global instance.
 -- Public namespaces: Util, Signal, Services, Connections, Instance, Tasks,
 --                    State, Drag, Sound, Storage
@@ -354,7 +354,7 @@ end
 
 -- ── State ─────────────────────────────────────────────────────────────────────
 -- Key-value store with optional namespaced scopes. State:Scope(key) returns a
--- proxy that prefixes all operations under that key — avoids key collisions.
+-- proxy that prefixes all operations under that key - avoids key collisions.
 
 local State = {}
 State.__index = State
@@ -698,8 +698,8 @@ end
 
 -- ── Sound ─────────────────────────────────────────────────────────────────────
 -- Resolves and plays audio from rbxassetid, local file path, or HTTP URL.
--- Resolve() tries: rbxassetid prefix → local file via getcustomasset →
---   external HTTP download → FallbackAssetId option (in that order).
+-- Resolve() tries: rbxassetid prefix -> local file via getcustomasset ->
+--   external HTTP download -> FallbackAssetId option (in that order).
 
 local Sound = {}
 Sound.__index = Sound

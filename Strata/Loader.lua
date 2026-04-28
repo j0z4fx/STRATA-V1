@@ -212,15 +212,46 @@ end
 Runtime.Cleanup = cleanupRuntime
 
 local function failLoader(message, detail)
-	local displayMsg = message
-	if detail ~= nil then
-		displayMsg = message .. ": " .. tostring(detail):sub(1, 80)
-		warn("[Strata Loader]", message, detail)
+	local fullDetail = detail ~= nil and tostring(detail) or ""
+
+	-- Full error to output (not truncated)
+	if #fullDetail > 0 then
+		warn("[Strata Loader]", message .. "\n  Detail: " .. fullDetail)
+	else
+		warn("[Strata Loader]", message)
 	end
-	statusLabel.Text = displayMsg
-	percentLabel.Text = "ERR"
-	barFill.BackgroundTransparency = 0.55
+
+	-- Status bar: red fill
+	barFill.BackgroundColor3 = Color3.fromRGB(200, 55, 55)
+	barFill.BackgroundTransparency = 0
 	barFill.Size = UDim2.new(1, 0, 1, 0)
+
+	statusLabel.Text = message
+	statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+	percentLabel.Text = "ERR"
+	percentLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+
+	-- Show the compile / runtime detail in a second line
+	if #fullDetail > 0 then
+		root.Size = UDim2.fromOffset(320, 128)
+		createInstance("TextLabel", {
+			Name = "ErrorDetail",
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Font = Enum.Font.Gotham,
+			Position = UDim2.fromOffset(16, 90),
+			Size = UDim2.new(1, -32, 0, 28),
+			Text = fullDetail:sub(1, 220),
+			TextColor3 = Color3.fromRGB(200, 80, 80),
+			TextSize = 10,
+			TextTransparency = 0,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			Parent = root,
+		})
+	end
+
 	error(message, 0)
 end
 
@@ -405,7 +436,12 @@ local steps = {
 		Text = "Loading Toolkit...",
 		Error = "[Strata Loader] Failed to load Toolkit",
 		Run = function()
-			context.Toolkit = loadstring(Fetch(TOOLKIT_URL))()
+			local source = Fetch(TOOLKIT_URL)
+			local compiled, compileErr = loadstring(source)
+			if not compiled then
+				error("Compile error: " .. tostring(compileErr), 0)
+			end
+			context.Toolkit = compiled()
 		end,
 	},
 	{ Text = "Toolkit: resolving services" },
@@ -416,7 +452,12 @@ local steps = {
 		Text = "Loading Veil...",
 		Error = "[Strata Loader] Failed to load Veil",
 		Run = function()
-			local veilFactory = loadstring(Fetch(VEIL_URL))()
+			local source = Fetch(VEIL_URL)
+			local compiled, compileErr = loadstring(source)
+			if not compiled then
+				error("Compile error: " .. tostring(compileErr), 0)
+			end
+			local veilFactory = compiled()
 			context.Veil = veilFactory(context.Toolkit)
 		end,
 	},
@@ -426,21 +467,26 @@ local steps = {
 	{ Text = "Veil: ready" },
 	
 	{
-	    Text = "Loading Axis...",
-	    Error = "[Strata Loader] Failed to load Axis",
-	    Run = function()
-	        local loaded = loadstring(Fetch(AXIS_URL))()
-	
-	        if type(loaded) == "function" then
-	            context.Axis = loaded(context.Toolkit, context.Veil)
-	        else
-	            context.Axis = loaded
-	        end
-	
-	        if context.Axis and context.Axis.Surface and context.Axis.Surface:IsA("ScreenGui") then
-	            context.Axis.Surface.Enabled = false
-	        end
-	    end,
+		Text = "Loading Axis...",
+		Error = "[Strata Loader] Failed to load Axis",
+		Run = function()
+			local source = Fetch(AXIS_URL)
+			local compiled, compileErr = loadstring(source)
+			if not compiled then
+				error("Compile error: " .. tostring(compileErr), 0)
+			end
+			local loaded = compiled()
+
+			if type(loaded) == "function" then
+				context.Axis = loaded(context.Toolkit, context.Veil)
+			else
+				context.Axis = loaded
+			end
+
+			if context.Axis and context.Axis.Surface and context.Axis.Surface:IsA("ScreenGui") then
+				context.Axis.Surface.Enabled = false
+			end
+		end,
 	},
 
 	{
