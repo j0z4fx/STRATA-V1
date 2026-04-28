@@ -1,4 +1,4 @@
-return function(Toolkit, Veil)
+﻿return function(Toolkit, Veil)
 	assert(type(Toolkit) == "table", "[Axis] Toolkit dependency is required")
 	assert(type(Veil) == "table", "[Axis] Veil dependency is required")
 	assert(type(Toolkit.Drag) == "table", "[Axis] Toolkit.Drag is required")
@@ -26,6 +26,11 @@ return function(Toolkit, Veil)
 			return copy
 		end
 	end
+
+	-- Local aliases for Roblox API shortcuts that may be missing in some executors
+	local _udim2Offset = UDim2.fromOffset or function(x, y) return UDim2.new(0, x, 0, y) end
+	local _udim2Scale  = UDim2.fromScale  or function(x, y) return UDim2.new(x, 0, y, 0) end
+	local _v2zero = (type(_v2zero) ~= "nil" and _v2zero) or Vector2.new(0, 0)
 
 	local Axis = {
 		Version = "0.0.1",
@@ -213,8 +218,8 @@ return function(Toolkit, Veil)
 		end
 		return {
 			Image = imageId,
-			ImageRectSize = raw.ImageRectSize or raw.imageRectSize or Vector2.zero,
-			ImageRectOffset = raw.ImageRectOffset or raw.imageRectOffset or Vector2.zero,
+			ImageRectSize = raw.ImageRectSize or raw.imageRectSize or _v2zero,
+			ImageRectOffset = raw.ImageRectOffset or raw.imageRectOffset or _v2zero,
 		}
 	end
 
@@ -355,8 +360,8 @@ return function(Toolkit, Veil)
 				ImageColor3 = tint,
 				ImageRectSize = data.ImageRectSize,
 				ImageRectOffset = data.ImageRectOffset,
-				Position = UDim2.fromOffset(tab._iconPos, tab._iconPos),
-				Size = UDim2.fromOffset(tab._iconSize, tab._iconSize),
+				Position = _udim2Offset(tab._iconPos, tab._iconPos),
+				Size = _udim2Offset(tab._iconSize, tab._iconSize),
 				ScaleType = Enum.ScaleType.Fit,
 				ZIndex = 6,
 				Parent = parent,
@@ -370,8 +375,8 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = UDim2.fromOffset(0, 0),
-			Size = UDim2.fromOffset(TabButtonSize, TabButtonSize),
+			Position = _udim2Offset(0, 0),
+			Size = _udim2Offset(TabButtonSize, TabButtonSize),
 			Text = textChar,
 			TextColor3 = tint,
 			TextSize = 12,
@@ -433,7 +438,7 @@ return function(Toolkit, Veil)
 			Surface = "Notification",
 			Width = NotificationWidth,
 			AnchorPoint = Vector2.new(0, 0),
-			Position = UDim2.fromOffset(18, 18),
+			Position = _udim2Offset(18, 18),
 			HostSize = UDim2.new(0, 360, 1, -36),
 			HorizontalAlignment = Enum.HorizontalAlignment.Left,
 			VerticalAlignment = Enum.VerticalAlignment.Top,
@@ -620,15 +625,15 @@ return function(Toolkit, Veil)
 			Name = "BottomFill",
 			BackgroundColor3 = COLORS.Titlebar,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(0, 14),
+			Position = _udim2Offset(0, 14),
 			Size = UDim2.new(1, 0, 1, -14),
 			ZIndex = 2,
 			Parent = shell,
 		})
 
-		createStrokeLine(parent, UDim2.new(1, -28, 0, 1), UDim2.fromOffset(14, 0))
+		createStrokeLine(parent, UDim2.new(1, -28, 0, 1), _udim2Offset(14, 0))
 		createStrokeLine(parent, UDim2.new(1, 0, 0, 1), UDim2.new(0, 0, 1, -1))
-		createStrokeLine(parent, UDim2.new(0, 1, 1, -14), UDim2.fromOffset(0, 14))
+		createStrokeLine(parent, UDim2.new(0, 1, 1, -14), _udim2Offset(0, 14))
 		createStrokeLine(parent, UDim2.new(0, 1, 1, -14), UDim2.new(1, -1, 0, 14))
 
 		return shell
@@ -659,15 +664,15 @@ return function(Toolkit, Veil)
 			Name = "RightFill",
 			BackgroundColor3 = COLORS.Sidebar,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(14, 0),
+			Position = _udim2Offset(14, 0),
 			Size = UDim2.new(1, -14, 1, 0),
 			ZIndex = 2,
 			Parent = shell,
 		})
 
-		createStrokeLine(parent, UDim2.new(1, 0, 0, 1), UDim2.fromOffset(0, 0))
+		createStrokeLine(parent, UDim2.new(1, 0, 0, 1), _udim2Offset(0, 0))
 		createStrokeLine(parent, UDim2.new(0, 1, 1, 0), UDim2.new(1, -1, 0, 0))
-		createStrokeLine(parent, UDim2.new(0, 1, 1, -14), UDim2.fromOffset(0, 0))
+		createStrokeLine(parent, UDim2.new(0, 1, 1, -14), _udim2Offset(0, 0))
 		createStrokeLine(parent, UDim2.new(1, -14, 0, 1), UDim2.new(0, 14, 1, -1))
 
 		return shell
@@ -749,7 +754,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = STROKE_TRANSPARENCY,
 			BorderSizePixel = 0,
 			Position = UDim2.new(0.5, 0, 0.5, 0),
-			Size = UDim2.fromOffset(ContentDividerHandleWidth, ContentDividerHandleHeight),
+			Size = _udim2Offset(ContentDividerHandleWidth, ContentDividerHandleHeight),
 			ZIndex = 4,
 			Parent = divider,
 		})
@@ -760,7 +765,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = "",
 			ZIndex = 5,
 			Parent = divider,
@@ -797,7 +802,7 @@ return function(Toolkit, Veil)
 				BackgroundColor3 = COLORS.Accent,
 				BackgroundTransparency = 0.45,
 				BorderSizePixel = 0,
-				Size = UDim2.fromOffset(2, 8),
+				Size = _udim2Offset(2, 8),
 				ZIndex = 3,
 				Parent = guide,
 			})
@@ -921,7 +926,7 @@ return function(Toolkit, Veil)
 		local accessoryWidth = control.AccessoryWidth or 0
 
 		if control.AccessoryHost then
-			control.AccessoryHost.Size = UDim2.fromOffset(accessoryWidth, control.RowHeight or AccessoryButtonHeight)
+			control.AccessoryHost.Size = _udim2Offset(accessoryWidth, control.RowHeight or AccessoryButtonHeight)
 		end
 
 		if control.Type == "Toggle" then
@@ -959,7 +964,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = UDim2.new(1, 0, 0.5, 0),
-			Size = UDim2.fromOffset(0, control.RowHeight or AccessoryButtonHeight),
+			Size = _udim2Offset(0, control.RowHeight or AccessoryButtonHeight),
 			ZIndex = 6,
 			Parent = control.Holder,
 		})
@@ -1096,7 +1101,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundColor3 = COLORS.ToggleOffBackground,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(width, AccessoryButtonHeight),
+			Size = _udim2Offset(width, AccessoryButtonHeight),
 			Text = "",
 			ZIndex = 10,
 			Parent = parent,
@@ -1202,7 +1207,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 			BottomImage = "",
-			CanvasSize = UDim2.fromOffset(0, 0),
+			CanvasSize = _udim2Offset(0, 0),
 			MidImage = "",
 			ScrollBarImageColor3 = COLORS.Accent,
 			ScrollBarImageTransparency = 0.78,
@@ -1221,7 +1226,7 @@ return function(Toolkit, Veil)
 				BorderSizePixel = 0,
 				AutomaticCanvasSize = Enum.AutomaticSize.Y,
 				BottomImage = "",
-				CanvasSize = UDim2.fromOffset(0, 0),
+				CanvasSize = _udim2Offset(0, 0),
 				MidImage = "",
 				ScrollBarImageColor3 = COLORS.Accent,
 				ScrollBarImageTransparency = 0.78,
@@ -1239,7 +1244,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 			BottomImage = "",
-			CanvasSize = UDim2.fromOffset(0, 0),
+			CanvasSize = _udim2Offset(0, 0),
 			MidImage = "",
 			ScrollBarImageColor3 = COLORS.Accent,
 			ScrollBarImageTransparency = 0.78,
@@ -1288,7 +1293,7 @@ return function(Toolkit, Veil)
 		local ti = TweenInfo.new(dur, style, Enum.EasingDirection.Out)
 
 		local tween = TweenService:Create(card, ti, {
-			Position = UDim2.fromOffset(targetOffset.X, targetOffset.Y),
+			Position = _udim2Offset(targetOffset.X, targetOffset.Y),
 		})
 		local tweens = { tween }
 
@@ -1366,7 +1371,7 @@ return function(Toolkit, Veil)
 			ClipsDescendants = false,
 			Interactable = false,
 			LayoutOrder = layoutOrder,
-			Size = UDim2.fromOffset(width, 0),
+			Size = _udim2Offset(width, 0),
 			ZIndex = zIndex,
 			Parent = host,
 		})
@@ -1523,8 +1528,8 @@ return function(Toolkit, Veil)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(960, 540),
+			Position = _udim2Scale(0.5, 0.5),
+			Size = _udim2Offset(960, 540),
 			Parent = self.Surface,
 		})
 
@@ -1533,7 +1538,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
 			ClipsDescendants = true,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			ZIndex = 1,
 			Parent = self.Frame,
 		})
@@ -1560,8 +1565,8 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = UDim2.fromOffset(14, 11),
-			Size = UDim2.fromOffset(titleWidth, 18),
+			Position = _udim2Offset(14, 11),
+			Size = _udim2Offset(titleWidth, 18),
 			Text = self.Title,
 			TextColor3 = COLORS.Text,
 			TextSize = 14,
@@ -1577,8 +1582,8 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Accent,
 			BackgroundTransparency = 0.8,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(14 + titleWidth + 4, 11),
-			Size = UDim2.fromOffset(chipWidth, 18),
+			Position = _udim2Offset(14 + titleWidth + 4, 11),
+			Size = _udim2Offset(chipWidth, 18),
 			Font = Enum.Font.GothamMedium,
 			Text = self.StatusText,
 			TextColor3 = COLORS.Accent,
@@ -1611,7 +1616,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = UDim2.new(1, -10, 0.5, 0),
-			Size = UDim2.fromOffset(searchBtnSize, searchBtnSize),
+			Size = _udim2Offset(searchBtnSize, searchBtnSize),
 			Text = "",
 			ZIndex = 6,
 			Parent = self.Titlebar,
@@ -1623,8 +1628,8 @@ return function(Toolkit, Veil)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(14, 14),
+			Position = _udim2Scale(0.5, 0.5),
+			Size = _udim2Offset(14, 14),
 			ScaleType = Enum.ScaleType.Fit,
 			ImageColor3 = COLORS.Text,
 			ImageTransparency = 0.4,
@@ -1650,8 +1655,8 @@ return function(Toolkit, Veil)
 					BackgroundTransparency = 1,
 					BorderSizePixel = 0,
 					Font = Enum.Font.GothamMedium,
-					Position = UDim2.fromScale(0.5, 0.5),
-					Size = UDim2.fromOffset(searchBtnSize, searchBtnSize),
+					Position = _udim2Scale(0.5, 0.5),
+					Size = _udim2Offset(searchBtnSize, searchBtnSize),
 					Text = "⌕",
 					TextColor3 = COLORS.Text,
 					TextTransparency = 0.4,
@@ -1677,7 +1682,7 @@ return function(Toolkit, Veil)
 			Name = "Body",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(0, 40),
+			Position = _udim2Offset(0, 40),
 			Size = UDim2.new(1, 0, 1, -40),
 			ZIndex = 2,
 			Parent = self.WindowBackground,
@@ -1698,7 +1703,7 @@ return function(Toolkit, Veil)
 			Name = "TopTabList",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(SidebarInset, SidebarInset),
+			Position = _udim2Offset(SidebarInset, SidebarInset),
 			Size = UDim2.new(
 				1,
 				-(SidebarInset * 2),
@@ -1744,7 +1749,7 @@ return function(Toolkit, Veil)
 			Name = "Content",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(SidebarWidth, 0),
+			Position = _udim2Offset(SidebarWidth, 0),
 			Size = UDim2.new(1, -SidebarWidth, 1, 0),
 			ZIndex = 2,
 			Parent = self.Body,
@@ -1755,7 +1760,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
 			ClipsDescendants = true,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			ZIndex = 2,
 			Parent = self.Content,
 		})
@@ -1768,7 +1773,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Interactable = false,
-			Size = UDim2.fromOffset(13, 13),
+			Size = _udim2Offset(13, 13),
 			ZIndex = 500,
 			Parent = self.Surface,
 		})
@@ -1780,8 +1785,8 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 0.28,
 			BorderSizePixel = 0,
 			Interactable = false,
-			Position = UDim2.fromOffset(-2048, -2048),
-			Size = UDim2.fromOffset(12, 12),
+			Position = _udim2Offset(-2048, -2048),
+			Size = _udim2Offset(12, 12),
 			Visible = true,
 			ZIndex = 520,
 			Parent = self.Surface,
@@ -1796,10 +1801,10 @@ return function(Toolkit, Veil)
 		})
 
 		local cursorParts = {
-			{ Name = "VerticalStroke", Size = UDim2.fromOffset(3, 13), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 500 },
-			{ Name = "HorizontalStroke", Size = UDim2.fromOffset(13, 3), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 500 },
-			{ Name = "VerticalFill", Size = UDim2.fromOffset(1, 11), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 501 },
-			{ Name = "HorizontalFill", Size = UDim2.fromOffset(11, 1), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 501 },
+			{ Name = "VerticalStroke", Size = _udim2Offset(3, 13), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 500 },
+			{ Name = "HorizontalStroke", Size = _udim2Offset(13, 3), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Window, Z = 500 },
+			{ Name = "VerticalFill", Size = _udim2Offset(1, 11), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 501 },
+			{ Name = "HorizontalFill", Size = _udim2Offset(11, 1), Position = UDim2.new(0.5, 0, 0.5, 0), Color = COLORS.Accent, Z = 501 },
 		}
 
 		for _, part in ipairs(cursorParts) do
@@ -1824,7 +1829,7 @@ return function(Toolkit, Veil)
 			local mouseLocation = UserInputService:GetMouseLocation()
 
 			if self.Cursor then
-				self.Cursor.Position = UDim2.fromOffset(mouseLocation.X, mouseLocation.Y)
+				self.Cursor.Position = _udim2Offset(mouseLocation.X, mouseLocation.Y)
 				self.Cursor.Visible = self.Visible and self.CursorVisible
 			end
 
@@ -1834,7 +1839,7 @@ return function(Toolkit, Veil)
 				local tooltipHeight = self.Tooltip.AbsoluteSize.Y
 				local nextX = math.clamp(mouseLocation.X + TooltipOffset.X, 10, math.max(10, viewportSize.X - tooltipWidth - 10))
 				local nextY = math.clamp(mouseLocation.Y + TooltipOffset.Y, tooltipHeight + 10, math.max(tooltipHeight + 10, viewportSize.Y - 10))
-				self.Tooltip.Position = UDim2.fromOffset(nextX, nextY)
+				self.Tooltip.Position = _udim2Offset(nextX, nextY)
 			end
 
 			for _, tab in ipairs(self.Tabs) do
@@ -1980,7 +1985,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Font = Enum.Font.Gotham,
 			Interactable = false,
-			Size = UDim2.fromOffset(0, 0),
+			Size = _udim2Offset(0, 0),
 			Text = "",
 			TextColor3 = COLORS.Text,
 			TextSize = 12,
@@ -2045,12 +2050,12 @@ return function(Toolkit, Veil)
 
 		local singleLineSize = measureText(text, 12, Enum.Font.Gotham)
 		if singleLineSize.X > TooltipMaxWidth then
-			self.TooltipLabel.Size = UDim2.fromOffset(TooltipMaxWidth, 0)
+			self.TooltipLabel.Size = _udim2Offset(TooltipMaxWidth, 0)
 			self.TooltipLabel.AutomaticSize = Enum.AutomaticSize.Y
 			self.TooltipLabel.TextWrapped = true
 		else
 			self.TooltipLabel.AutomaticSize = Enum.AutomaticSize.XY
-			self.TooltipLabel.Size = UDim2.fromOffset(0, 0)
+			self.TooltipLabel.Size = _udim2Offset(0, 0)
 		end
 
 		TweenService:Create(self.Tooltip, TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -2157,7 +2162,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			LayoutOrder = tab.PinnedBottom and 1 or tab.Order,
-			Size = UDim2.fromOffset(TabButtonSize, TabButtonSize),
+			Size = _udim2Offset(TabButtonSize, TabButtonSize),
 			Text = "",
 			ZIndex = 5,
 			Parent = buttonParent,
@@ -2177,7 +2182,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Accent,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(TabButtonSize, TabButtonSize),
+			Size = _udim2Offset(TabButtonSize, TabButtonSize),
 			ZIndex = 5,
 			Parent = tab.TabButton,
 		})
@@ -2192,7 +2197,7 @@ return function(Toolkit, Veil)
 			Name = tab.Name .. "Content",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Visible = false,
 			ZIndex = 2,
 			Parent = self.TabContentHost,
@@ -2388,7 +2393,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = hasSubtext and UDim2.fromOffset(0, 6) or UDim2.new(0, 0, 0.5, 0),
+			Position = hasSubtext and _udim2Offset(0, 6) or UDim2.new(0, 0, 0.5, 0),
 			Size = UDim2.new(1, 0, 0, 18),
 			Text = label.Text,
 			TextColor3 = COLORS.Text,
@@ -2406,7 +2411,7 @@ return function(Toolkit, Veil)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Font = Enum.Font.Gotham,
-				Position = UDim2.fromOffset(0, 24),
+				Position = _udim2Offset(0, 24),
 				Size = UDim2.new(1, 0, 0, 16),
 				Text = label.Subtext,
 				TextColor3 = COLORS.Text,
@@ -2503,7 +2508,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
 			Position = UDim2.new(0.5, 0, 0, visualCenterY),
-			Size = UDim2.fromOffset(clampedTextWidth, 18),
+			Size = _udim2Offset(clampedTextWidth, 18),
 			Text = text,
 			TextColor3 = COLORS.Text,
 			TextSize = 12,
@@ -2574,7 +2579,7 @@ return function(Toolkit, Veil)
 		nextX = math.clamp(nextX, 10, math.max(10, viewportSize.X - width - 10))
 		nextY = math.clamp(nextY, 10, math.max(10, viewportSize.Y - height - 10))
 
-		popup.Position = UDim2.fromOffset(nextX, nextY)
+		popup.Position = _udim2Offset(nextX, nextY)
 	end
 
 	-- PickerSurface-local placement: below anchor when possible, else above.
@@ -2586,7 +2591,7 @@ return function(Toolkit, Veil)
 		local viewportSize = getViewportSize()
 		local anchorPos = anchor.AbsolutePosition
 		local anchorSize = anchor.AbsoluteSize
-		local surfaceOffset = Axis.PickerSurface and Axis.PickerSurface.AbsolutePosition or Vector2.zero
+		local surfaceOffset = Axis.PickerSurface and Axis.PickerSurface.AbsolutePosition or _v2zero
 		local relX = anchorPos.X - surfaceOffset.X
 		local relY = anchorPos.Y - surfaceOffset.Y
 		local belowY = relY + anchorSize.Y + DropdownPanelGap
@@ -2605,8 +2610,8 @@ return function(Toolkit, Veil)
 			nextY = math.clamp(belowY, 10, math.max(10, viewportSize.Y - panelHeight - 10))
 			direction = "below"
 		end
-		panel.Size = UDim2.fromOffset(panelWidth, panelHeight)
-		panel.Position = UDim2.fromOffset(nextX, nextY)
+		panel.Size = _udim2Offset(panelWidth, panelHeight)
+		panel.Position = _udim2Offset(nextX, nextY)
 		return direction
 	end
 
@@ -2665,7 +2670,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = displayText,
 			TextColor3 = COLORS.Text,
 			TextSize = 11,
@@ -2682,7 +2687,7 @@ return function(Toolkit, Veil)
 			Name = "AxisKeypickerModeMenu",
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(KeypickerModeMenuWidth, getModeMenuHeight(#allowedModes)),
+			Size = _udim2Offset(KeypickerModeMenuWidth, getModeMenuHeight(#allowedModes)),
 			Visible = false,
 			ZIndex = 244,
 			Parent = pickerSurface,
@@ -2745,7 +2750,7 @@ return function(Toolkit, Veil)
 		function keypicker:_refreshButton()
 			local width = math.max(KeypickerMinWidth, math.ceil(measureText(self.Capturing and "..." or self.Value, 11, Enum.Font.GothamMedium).X) + AccessoryTextPadding)
 			local active = self:GetState()
-			self.Button.Size = UDim2.fromOffset(width, AccessoryButtonHeight)
+			self.Button.Size = _udim2Offset(width, AccessoryButtonHeight)
 			self.ButtonLabel.Text = self.Capturing and "..." or self.Value
 			self.Button.BackgroundColor3 = active and COLORS.Accent or COLORS.ToggleOffBackground
 			self.Button.BackgroundTransparency = self.Disabled and 0.2 or (active and 0.4 or 0)
@@ -2768,7 +2773,7 @@ return function(Toolkit, Veil)
 			if self.ModeMenu:GetAttribute("AxisOpen") then
 				self.ModeMenu:SetAttribute("AxisOpen", false)
 				local currentPos = self.ModeMenu.Position
-				local finalPos = UDim2.fromOffset(currentPos.X.Offset, currentPos.Y.Offset - DropdownAnimSlide)
+				local finalPos = _udim2Offset(currentPos.X.Offset, currentPos.Y.Offset - DropdownAnimSlide)
 				local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 				local anim = TweenService:Create(self.ModeMenu, tweenInfo, {
 					BackgroundTransparency = 1,
@@ -2783,12 +2788,12 @@ return function(Toolkit, Veil)
 				anim.Completed:Connect(function()
 					if self.ModeMenu and not self.ModeMenu:GetAttribute("AxisOpen") then
 						self.ModeMenu.Visible = false
-						self.ModeMenu.Position = UDim2.fromOffset(-4000, -4000)
+						self.ModeMenu.Position = _udim2Offset(-4000, -4000)
 					end
 				end)
 			else
 				self.ModeMenu.Visible = false
-				self.ModeMenu.Position = UDim2.fromOffset(-4000, -4000)
+				self.ModeMenu.Position = _udim2Offset(-4000, -4000)
 			end
 			if Axis.ActivePickerPopup == self.ModeMenu then
 				Axis.ActivePickerPopup = nil
@@ -2813,7 +2818,7 @@ return function(Toolkit, Veil)
 			if self.ModeMenuBorder then
 				self.ModeMenuBorder.Transparency = 1
 			end
-			self.ModeMenu.Position = UDim2.fromOffset(-4000, -4000)
+			self.ModeMenu.Position = _udim2Offset(-4000, -4000)
 			self.ModeMenu.Visible = true
 			self.ModeMenu:SetAttribute("AxisOpen", true)
 			if Axis.PickerBackdrop then
@@ -2827,7 +2832,7 @@ return function(Toolkit, Veil)
 				local h = getModeMenuHeight(#self.Modes)
 				self.Window:_positionPickerPanelBelowAnchor(self.Button, self.ModeMenu, KeypickerModeMenuWidth, h)
 				local finalPos = self.ModeMenu.Position
-				self.ModeMenu.Position = UDim2.fromOffset(finalPos.X.Offset, finalPos.Y.Offset - DropdownAnimSlide)
+				self.ModeMenu.Position = _udim2Offset(finalPos.X.Offset, finalPos.Y.Offset - DropdownAnimSlide)
 				local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 				TweenService:Create(self.ModeMenu, tweenInfo, {
 					BackgroundTransparency = 0,
@@ -3066,7 +3071,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = "",
 			ZIndex = 12,
 			Parent = colorpicker.Button,
@@ -3079,7 +3084,7 @@ return function(Toolkit, Veil)
 			AutomaticSize = Enum.AutomaticSize.None,
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(PickerPopupWidth, PickerPopupHeight),
+			Size = _udim2Offset(PickerPopupWidth, PickerPopupHeight),
 			Visible = false,
 			ZIndex = 260,
 			Parent = pickerSurface,
@@ -3103,7 +3108,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = "Color",
 			TextColor3 = COLORS.Text,
 			TextSize = 12,
@@ -3119,7 +3124,7 @@ return function(Toolkit, Veil)
 			Name = "PickerBody",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(0, PickerPreviewHeight + 8),
+			Position = _udim2Offset(0, PickerPreviewHeight + 8),
 			Size = UDim2.new(1, 0, 0, pickerBodyHeight),
 			ZIndex = 261,
 			Parent = colorpicker.Popup,
@@ -3142,7 +3147,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Image = "rbxassetid://4155801252",
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			ZIndex = 262,
 			Parent = colorpicker.Map,
 		})
@@ -3153,7 +3158,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = "",
 			ZIndex = 265,
 			Parent = colorpicker.Map,
@@ -3164,7 +3169,7 @@ return function(Toolkit, Veil)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(8, 8),
+			Size = _udim2Offset(8, 8),
 			ZIndex = 263,
 			Parent = colorpicker.Map,
 		})
@@ -3176,7 +3181,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Text,
 			BorderSizePixel = 0,
 			Position = UDim2.new(0.5, 0, 0.5, 0),
-			Size = UDim2.fromOffset(4, 4),
+			Size = _udim2Offset(4, 4),
 			ZIndex = 264,
 			Parent = colorpicker.MapCursorOuter,
 		})
@@ -3188,7 +3193,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = Color3.new(1, 1, 1),
 			BorderSizePixel = 0,
 			Position = UDim2.new(1, -PickerHueWidth, 0, 0),
-			Size = UDim2.fromOffset(PickerHueWidth, PickerMapSize.Y),
+			Size = _udim2Offset(PickerHueWidth, PickerMapSize.Y),
 			ZIndex = 261,
 			Parent = pickerBody,
 		})
@@ -3214,7 +3219,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = "",
 			ZIndex = 264,
 			Parent = colorpicker.HueBar,
@@ -3237,7 +3242,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.Gotham,
-			Position = UDim2.fromOffset(0, PickerPreviewHeight + 8 + pickerBodyHeight + 8),
+			Position = _udim2Offset(0, PickerPreviewHeight + 8 + pickerBodyHeight + 8),
 			Size = UDim2.new(1, 0, 0, 14),
 			Text = "Alpha support reserved",
 			TextColor3 = COLORS.Text,
@@ -3338,7 +3343,7 @@ return function(Toolkit, Veil)
 			if not colorpicker.Popup or not colorpicker.Popup:GetAttribute("AxisOpen") then return end
 			colorpicker.Popup:SetAttribute("AxisOpen", false)
 			local currentPos = colorpicker.Popup.Position
-			local finalPos = UDim2.fromOffset(currentPos.X.Offset, currentPos.Y.Offset - DropdownAnimSlide)
+			local finalPos = _udim2Offset(currentPos.X.Offset, currentPos.Y.Offset - DropdownAnimSlide)
 			local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 			TweenService:Create(colorpicker.Popup, tweenInfo, {
 				BackgroundTransparency = 1,
@@ -3352,7 +3357,7 @@ return function(Toolkit, Veil)
 			task.delay(DropdownAnimTime, function()
 				if not colorpicker.Popup:GetAttribute("AxisOpen") then
 					colorpicker.Popup.Visible = false
-					colorpicker.Popup.Position = UDim2.fromOffset(-4000, -4000)
+					colorpicker.Popup.Position = _udim2Offset(-4000, -4000)
 				end
 			end)
 			if Axis.ActivePickerPopup == colorpicker.Popup then
@@ -3375,7 +3380,7 @@ return function(Toolkit, Veil)
 			Axis.ActivePickerClose = function() closePopup() end
 			colorpicker.Popup.BackgroundTransparency = 1
 			if colorpicker.PopupBorder then colorpicker.PopupBorder.Transparency = 1 end
-			colorpicker.Popup.Position = UDim2.fromOffset(-4000, -4000)
+			colorpicker.Popup.Position = _udim2Offset(-4000, -4000)
 			colorpicker.Popup.Visible = true
 			colorpicker.Popup:SetAttribute("AxisOpen", true)
 			if Axis.PickerBackdrop then
@@ -3386,7 +3391,7 @@ return function(Toolkit, Veil)
 				if not colorpicker.Popup or not colorpicker.Popup.Visible then return end
 				self:_positionPickerPopup(colorpicker.Button, colorpicker.Popup)
 				local finalPos = colorpicker.Popup.Position
-				colorpicker.Popup.Position = UDim2.fromOffset(
+				colorpicker.Popup.Position = _udim2Offset(
 					finalPos.X.Offset,
 					finalPos.Y.Offset - DropdownAnimSlide
 				)
@@ -3531,7 +3536,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = "",
 			ZIndex = 8,
 			Parent = toggle.Holder,
@@ -3541,7 +3546,7 @@ return function(Toolkit, Veil)
 			Name = "LabelWrap",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = hasSubtext and UDim2.fromOffset(0, 6) or UDim2.fromOffset(0, 0),
+			Position = hasSubtext and _udim2Offset(0, 6) or _udim2Offset(0, 0),
 			Size = hasSubtext
 				and UDim2.new(1, -(ToggleSwitchWidth + 16), 1, -12)
 				or UDim2.new(1, -(ToggleSwitchWidth + 16), 1, 0),
@@ -3555,7 +3560,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = hasSubtext and UDim2.fromOffset(0, 0) or UDim2.new(0, 0, 0.5, 0),
+			Position = hasSubtext and _udim2Offset(0, 0) or UDim2.new(0, 0, 0.5, 0),
 			Size = UDim2.new(1, 0, 0, 18),
 			Text = toggle.Text,
 			TextColor3 = COLORS.Text,
@@ -3573,7 +3578,7 @@ return function(Toolkit, Veil)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Font = Enum.Font.Gotham,
-				Position = UDim2.fromOffset(0, 18),
+				Position = _udim2Offset(0, 18),
 				Size = UDim2.new(1, 0, 0, 16),
 				Text = toggle.Subtext,
 				TextColor3 = COLORS.Text,
@@ -3592,7 +3597,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.ToggleOffBackground,
 			BorderSizePixel = 0,
 			Position = UDim2.new(1, -(ToggleSwitchWidth * 0.5), 0.5, 0),
-			Size = UDim2.fromOffset(ToggleSwitchWidth, ToggleSwitchHeight),
+			Size = _udim2Offset(ToggleSwitchWidth, ToggleSwitchHeight),
 			ZIndex = 5,
 			Parent = toggle.Holder,
 		})
@@ -3603,8 +3608,8 @@ return function(Toolkit, Veil)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = COLORS.ToggleOffDot,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(2 + (ToggleDotSize * 0.5), ToggleSwitchHeight * 0.5),
-			Size = UDim2.fromOffset(ToggleDotSize, ToggleDotSize),
+			Position = _udim2Offset(2 + (ToggleDotSize * 0.5), ToggleSwitchHeight * 0.5),
+			Size = _udim2Offset(ToggleDotSize, ToggleDotSize),
 			ZIndex = 6,
 			Parent = toggle.Switch,
 		})
@@ -3626,7 +3631,7 @@ return function(Toolkit, Veil)
 			local dotOnX = ToggleSwitchWidth - 3 - (ToggleDotSize * 0.5) - 1
 			local targetBackground = value and COLORS.Accent or COLORS.ToggleOffBackground
 			local targetDotColor = value and COLORS.ToggleOnDot or COLORS.ToggleOffDot
-			local targetDotPosition = UDim2.fromOffset(value and dotOnX or dotOffX, ToggleSwitchHeight * 0.5)
+			local targetDotPosition = _udim2Offset(value and dotOnX or dotOffX, ToggleSwitchHeight * 0.5)
 			local titleTransparency = disabled and 0.45 or 0
 			local subtextTransparency = disabled and 0.6 or 0.35
 			local switchTransparency = disabled and 0.25 or 0
@@ -3777,13 +3782,13 @@ return function(Toolkit, Veil)
 			if toggle.Disabled then return end
 			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
 			TweenService:Create(toggle.SwitchDot, pressTI, {
-				Size = UDim2.fromOffset(ToggleDotPressSize, ToggleDotPressSize),
+				Size = _udim2Offset(ToggleDotPressSize, ToggleDotPressSize),
 			}):Play()
 		end)
 		toggle.Button.InputEnded:Connect(function(input)
 			if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
 			TweenService:Create(toggle.SwitchDot, pressTI, {
-				Size = UDim2.fromOffset(ToggleDotSize, ToggleDotSize),
+				Size = _udim2Offset(ToggleDotSize, ToggleDotSize),
 			}):Play()
 		end)
 
@@ -3827,7 +3832,7 @@ return function(Toolkit, Veil)
 				or state == "hover" and SliderThumbHoverDiameter
 				or SliderThumbDiameter
 			TweenService:Create(thumb, thumbTI, {
-				Size = UDim2.fromOffset(d, d),
+				Size = _udim2Offset(d, d),
 			}):Play()
 		end
 	end
@@ -3837,7 +3842,7 @@ return function(Toolkit, Veil)
 			Name = "TrackZone",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(0, trackZoneTop),
+			Position = _udim2Offset(0, trackZoneTop),
 			Size = UDim2.new(1, 0, 0, SliderThumbDiameter),
 			ZIndex = 5,
 			Parent = holder,
@@ -3847,7 +3852,7 @@ return function(Toolkit, Veil)
 			Name = "TrackBg",
 			BackgroundColor3 = COLORS.ToggleOffBackground,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(thumbRadius, trackInsetY),
+			Position = _udim2Offset(thumbRadius, trackInsetY),
 			Size = UDim2.new(1, -SliderThumbDiameter, 0, SliderTrackHeight),
 			ZIndex = 5,
 			Parent = trackZone,
@@ -3869,8 +3874,8 @@ return function(Toolkit, Veil)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = COLORS.Accent,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(thumbRadius, SliderThumbDiameter / 2),
-			Size = UDim2.fromOffset(SliderThumbDiameter, SliderThumbDiameter),
+			Position = _udim2Offset(thumbRadius, SliderThumbDiameter / 2),
+			Size = _udim2Offset(SliderThumbDiameter, SliderThumbDiameter),
 			ZIndex = 7,
 			Parent = trackZone,
 		})
@@ -3881,7 +3886,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = "",
 			ZIndex = 8,
 			Parent = trackZone,
@@ -3896,7 +3901,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = UDim2.fromOffset(0, 0),
+			Position = _udim2Offset(0, 0),
 			Size = UDim2.new(1, -SliderValueWidth, 0, 18),
 			Text = name,
 			TextColor3 = COLORS.Text,
@@ -3915,7 +3920,7 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
 			Position = UDim2.new(1, 0, 0, 0),
-			Size = UDim2.fromOffset(SliderValueWidth, 18),
+			Size = _udim2Offset(SliderValueWidth, 18),
 			Text = "",
 			TextColor3 = COLORS.Text,
 			TextSize = 12,
@@ -3933,7 +3938,7 @@ return function(Toolkit, Veil)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Font = Enum.Font.Gotham,
-				Position = UDim2.fromOffset(0, 18),
+				Position = _udim2Offset(0, 18),
 				Size = UDim2.new(1, 0, 0, 16),
 				Text = subtext,
 				TextColor3 = COLORS.Text,
@@ -4030,7 +4035,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = "",
 			ZIndex = 8,
 			Parent = dropdown.Holder,
@@ -4071,7 +4076,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.ToggleOffBackground,
 			BorderSizePixel = 0,
 			Position = UDim2.new(1, 0, 0.5, 0),
-			Size = UDim2.fromOffset(DropdownValueWidth, AccessoryButtonHeight),
+			Size = _udim2Offset(DropdownValueWidth, AccessoryButtonHeight),
 			ZIndex = 5,
 			Parent = dropdown.Holder,
 		})
@@ -4089,7 +4094,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = computeBadgeText(),
 			TextColor3 = COLORS.Text,
 			TextSize = 11,
@@ -4107,7 +4112,7 @@ return function(Toolkit, Veil)
 			Name = "AxisDropdownPanel",
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(200, 100),
+			Size = _udim2Offset(200, 100),
 			Visible = false,
 			ZIndex = 244,
 			Parent = pickerSurface,
@@ -4144,7 +4149,7 @@ return function(Toolkit, Veil)
 				Font = Enum.Font.GothamMedium,
 				PlaceholderColor3 = COLORS.Text,
 				PlaceholderText = "Search...",
-				Size = UDim2.fromScale(1, 1),
+				Size = _udim2Scale(1, 1),
 				Text = "",
 				TextColor3 = COLORS.Text,
 				TextSize = 11,
@@ -4169,7 +4174,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			CanvasSize = UDim2.new(0, 0, 0, 0),
-			Position = UDim2.fromOffset(0, itemListOffsetY),
+			Position = _udim2Offset(0, itemListOffsetY),
 			ScrollBarThickness = 0,
 			ScrollingDirection = Enum.ScrollingDirection.Y,
 			Size = UDim2.new(1, 0, 1, -itemListOffsetY),
@@ -4235,7 +4240,7 @@ return function(Toolkit, Veil)
 			end
 			local totalHeight = #visibleItems * DropdownItemHeight
 				+ math.max(0, #visibleItems - 1) * DropdownItemSpacing
-			dropdown.ItemList.CanvasSize = UDim2.fromOffset(0, totalHeight)
+			dropdown.ItemList.CanvasSize = _udim2Offset(0, totalHeight)
 		end
 
 		buildItems()
@@ -4258,7 +4263,7 @@ return function(Toolkit, Veil)
 			Axis.ActivePickerClose = function() self:Close() end
 			self.Panel.BackgroundTransparency = 1
 			if self.PanelBorder then self.PanelBorder.Transparency = 1 end
-			self.Panel.Position = UDim2.fromOffset(-4000, -4000)
+			self.Panel.Position = _udim2Offset(-4000, -4000)
 			self.Panel.Visible = true
 			self.Panel:SetAttribute("AxisOpen", true)
 			if Axis.PickerBackdrop then
@@ -4273,7 +4278,7 @@ return function(Toolkit, Veil)
 				local finalPos = self.Panel.Position
 				-- Slide from opposite side: below→slide down from above; above→slide up from below
 				local slideY = direction == "above" and DropdownAnimSlide or -DropdownAnimSlide
-				self.Panel.Position = UDim2.fromOffset(
+				self.Panel.Position = _udim2Offset(
 					finalPos.X.Offset,
 					finalPos.Y.Offset + slideY
 				)
@@ -4301,7 +4306,7 @@ return function(Toolkit, Veil)
 				local currentPos = self.Panel.Position
 				-- Slide out toward origin: below→slide up; above→slide down
 				local slideY = self._openDirection == "above" and DropdownAnimSlide or -DropdownAnimSlide
-				local finalPos = UDim2.fromOffset(currentPos.X.Offset, currentPos.Y.Offset + slideY)
+				local finalPos = _udim2Offset(currentPos.X.Offset, currentPos.Y.Offset + slideY)
 				
 				local tweenInfo = TweenInfo.new(DropdownAnimTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 				local anim = TweenService:Create(self.Panel, tweenInfo, {
@@ -4319,7 +4324,7 @@ return function(Toolkit, Veil)
 				anim.Completed:Connect(function()
 					if not self.Panel:GetAttribute("AxisOpen") then
 						self.Panel.Visible = false
-						self.Panel.Position = UDim2.fromOffset(-4000, -4000)
+						self.Panel.Position = _udim2Offset(-4000, -4000)
 					end
 				end)
 			end
@@ -4554,7 +4559,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.ToggleOffBackground,
 			BorderSizePixel = 0,
 			Position = UDim2.new(1, 0, 0.5, 0),
-			Size = UDim2.fromOffset(InputFieldWidth, AccessoryButtonHeight),
+			Size = _udim2Offset(InputFieldWidth, AccessoryButtonHeight),
 			ZIndex = 5,
 			Parent = input.Holder,
 		})
@@ -4576,7 +4581,7 @@ return function(Toolkit, Veil)
 			Font = Enum.Font.GothamMedium,
 			PlaceholderColor3 = COLORS.Text,
 			PlaceholderText = input.Placeholder,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = input.Value,
 			TextColor3 = COLORS.Text,
 			TextSize = 11,
@@ -4758,7 +4763,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.ToggleOffBackground,
 			BorderSizePixel = 0,
 			Position = UDim2.new(1, 0, 0.5, 0),
-			Size = UDim2.fromOffset(InputFieldWidth, AccessoryButtonHeight),
+			Size = _udim2Offset(InputFieldWidth, AccessoryButtonHeight),
 			ZIndex = 5,
 			Parent = sinput.Holder,
 		})
@@ -4784,7 +4789,7 @@ return function(Toolkit, Veil)
 			Font = Enum.Font.GothamMedium,
 			PlaceholderColor3 = COLORS.Text,
 			PlaceholderText = sinput.Placeholder,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = maskText,
 			TextColor3 = COLORS.Text,
 			TextSize = 11,
@@ -4928,7 +4933,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = bgTransp,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamBold,
-			Position = UDim2.fromOffset(0, ButtonInnerInsetY),
+			Position = _udim2Offset(0, ButtonInnerInsetY),
 			Size = UDim2.new(1, 0, 1, -(ButtonInnerInsetY * 2)),
 			Text = btn.Name,
 			TextColor3 = textColor,
@@ -5072,7 +5077,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = hasSubtext and UDim2.fromOffset(0, 6) or UDim2.new(0, 0, 0.5, 0),
+			Position = hasSubtext and _udim2Offset(0, 6) or UDim2.new(0, 0, 0.5, 0),
 			Size = UDim2.new(1, -(CheckboxSize + 10), 0, 18),
 			Text = cb.Name,
 			TextColor3 = COLORS.Text,
@@ -5090,7 +5095,7 @@ return function(Toolkit, Veil)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Font = Enum.Font.Gotham,
-				Position = UDim2.fromOffset(0, 24),
+				Position = _udim2Offset(0, 24),
 				Size = UDim2.new(1, -(CheckboxSize + 10), 0, 16),
 				Text = subtext,
 				TextColor3 = COLORS.Text,
@@ -5109,7 +5114,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = cb.Checked and 0 or 1,
 			BorderSizePixel = 0,
 			Position = UDim2.new(1, 0, 0.5, 0),
-			Size = UDim2.fromOffset(CheckboxSize, CheckboxSize),
+			Size = _udim2Offset(CheckboxSize, CheckboxSize),
 			ZIndex = 5,
 			Parent = cb.Holder,
 		})
@@ -5129,8 +5134,8 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamBold,
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(CheckboxSize, CheckboxSize),
+			Position = _udim2Scale(0.5, 0.5),
+			Size = _udim2Offset(CheckboxSize, CheckboxSize),
 			Text = "✓",
 			TextColor3 = COLORS.Window,
 			TextSize = 13,
@@ -5189,13 +5194,13 @@ return function(Toolkit, Veil)
 		cb.Button.MouseButton1Down:Connect(function()
 			if cb.Disabled then return end
 			TweenService:Create(cb.Box, fastTI, {
-				Size = UDim2.fromOffset(CheckboxSize - 2, CheckboxSize - 2),
+				Size = _udim2Offset(CheckboxSize - 2, CheckboxSize - 2),
 			}):Play()
 		end)
 
 		cb.Button.MouseButton1Up:Connect(function()
 			TweenService:Create(cb.Box, fastTI, {
-				Size = UDim2.fromOffset(CheckboxSize, CheckboxSize),
+				Size = _udim2Offset(CheckboxSize, CheckboxSize),
 			}):Play()
 		end)
 
@@ -5275,7 +5280,7 @@ return function(Toolkit, Veil)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Font = Enum.Font.GothamMedium,
-				Position = UDim2.fromOffset(0, 0),
+				Position = _udim2Offset(0, 0),
 				Size = UDim2.new(1, 0, 0, labelHeight),
 				Text = radio.Name,
 				TextColor3 = COLORS.Text,
@@ -5291,7 +5296,7 @@ return function(Toolkit, Veil)
 			Name = "Body",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(0, labelHeight),
+			Position = _udim2Offset(0, labelHeight),
 			Size = UDim2.new(1, 0, 0, bodyHeight),
 			Parent = radio.Holder,
 		})
@@ -5360,7 +5365,7 @@ return function(Toolkit, Veil)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Position = UDim2.new(0, 0, 0.5, 0),
-				Size = UDim2.fromOffset(RadioCircleSize, RadioCircleSize),
+				Size = _udim2Offset(RadioCircleSize, RadioCircleSize),
 				ZIndex = 5,
 				Parent = itemFrame,
 			})
@@ -5380,8 +5385,8 @@ return function(Toolkit, Veil)
 				BackgroundColor3 = COLORS.Accent,
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(RadioDotSize, RadioDotSize),
+				Position = _udim2Scale(0.5, 0.5),
+				Size = _udim2Offset(RadioDotSize, RadioDotSize),
 				ZIndex = 6,
 				Parent = circle,
 			})
@@ -5393,7 +5398,7 @@ return function(Toolkit, Veil)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Font = Enum.Font.Gotham,
-				Position = UDim2.fromOffset(RadioCircleSize + 6, 0),
+				Position = _udim2Offset(RadioCircleSize + 6, 0),
 				Size = UDim2.new(1, -(RadioCircleSize + 6), 1, 0),
 				Text = itemStr,
 				TextColor3 = COLORS.Text,
@@ -5475,8 +5480,8 @@ return function(Toolkit, Veil)
 	local function posLine(frame, x0, y0, x1, y1, h)
 		local dx, dy = x1 - x0, y1 - y0
 		local len = math.sqrt(dx*dx + dy*dy)
-		frame.Position = UDim2.fromOffset(x0, y0)
-		frame.Size = UDim2.fromOffset(math.max(1, len), h or CurveLineWidth)
+		frame.Position = _udim2Offset(x0, y0)
+		frame.Size = _udim2Offset(math.max(1, len), h or CurveLineWidth)
 		frame.Rotation = math.deg(math.atan2(dy, dx))
 	end
 
@@ -5520,7 +5525,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = UDim2.fromOffset(0, 0),
+			Position = _udim2Offset(0, 0),
 			Size = UDim2.new(1, 0, 0, labelHeight),
 			Text = curve.Name,
 			TextColor3 = COLORS.Text,
@@ -5535,7 +5540,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
 			ClipsDescendants = true,
-			Position = UDim2.fromOffset(0, labelHeight),
+			Position = _udim2Offset(0, labelHeight),
 			Size = UDim2.new(1, 0, 0, CurveCanvasHeight),
 			ZIndex = 5,
 			Parent = curve.Holder,
@@ -5551,7 +5556,7 @@ return function(Toolkit, Veil)
 					BackgroundColor3 = COLORS.Stroke,
 					BackgroundTransparency = 0.88,
 					BorderSizePixel = 0,
-					Position = axis == "H" and UDim2.fromScale(0, f) or UDim2.fromScale(f, 0),
+					Position = axis == "H" and _udim2Scale(0, f) or _udim2Scale(f, 0),
 					Size = axis == "H" and UDim2.new(1, 0, 0, 1) or UDim2.new(0, 1, 1, 0),
 					ZIndex = 5,
 					Parent = curve.Canvas,
@@ -5565,8 +5570,8 @@ return function(Toolkit, Veil)
 				AnchorPoint = Vector2.new(0, 0.5),
 				BackgroundColor3 = COLORS.Accent,
 				BorderSizePixel = 0,
-				Position = UDim2.fromOffset(0, 0),
-				Size = UDim2.fromOffset(0, CurveLineWidth),
+				Position = _udim2Offset(0, 0),
+				Size = _udim2Offset(0, CurveLineWidth),
 				ZIndex = 8,
 				Parent = curve.Canvas,
 			})
@@ -5579,7 +5584,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Stroke,
 			BackgroundTransparency = 0.5,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(0, 1),
+			Size = _udim2Offset(0, 1),
 			ZIndex = 7,
 			Parent = curve.Canvas,
 		})
@@ -5588,7 +5593,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Stroke,
 			BackgroundTransparency = 0.5,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(0, 1),
+			Size = _udim2Offset(0, 1),
 			ZIndex = 7,
 			Parent = curve.Canvas,
 		})
@@ -5599,8 +5604,8 @@ return function(Toolkit, Veil)
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundColor3 = COLORS.Window,
 				BorderSizePixel = 0,
-				Position = UDim2.fromOffset(0, 0),
-				Size = UDim2.fromOffset(CurveHandleSize, CurveHandleSize),
+				Position = _udim2Offset(0, 0),
+				Size = _udim2Offset(CurveHandleSize, CurveHandleSize),
 				ZIndex = 10,
 				Parent = curve.Canvas,
 			})
@@ -5616,8 +5621,8 @@ return function(Toolkit, Veil)
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundColor3 = COLORS.Accent,
 				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(CurveHandleInner, CurveHandleInner),
+				Position = _udim2Scale(0.5, 0.5),
+				Size = _udim2Offset(CurveHandleInner, CurveHandleInner),
 				ZIndex = 11,
 				Parent = outer,
 			})
@@ -5627,8 +5632,8 @@ return function(Toolkit, Veil)
 				AutoButtonColor = false,
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
-				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(CurveHandleSize + 8, CurveHandleSize + 8),
+				Position = _udim2Scale(0.5, 0.5),
+				Size = _udim2Offset(CurveHandleSize + 8, CurveHandleSize + 8),
 				Text = "",
 				ZIndex = 12,
 				Parent = outer,
@@ -5663,8 +5668,8 @@ return function(Toolkit, Veil)
 
 			local cp1x, cp1y = toCanvasPx(cp1.X, cp1.Y, cw, ch)
 			local cp2x, cp2y = toCanvasPx(cp2.X, cp2.Y, cw, ch)
-			h1Outer.Position = UDim2.fromOffset(cp1x, cp1y)
-			h2Outer.Position = UDim2.fromOffset(cp2x, cp2y)
+			h1Outer.Position = _udim2Offset(cp1x, cp1y)
+			h2Outer.Position = _udim2Offset(cp2x, cp2y)
 
 			posLine(ctrlLine1, 0, ch, cp1x, cp1y, 1)
 			posLine(ctrlLine2, cp2x, cp2y, cw, 0, 1)
@@ -5799,7 +5804,7 @@ return function(Toolkit, Veil)
 			local f = self.VisualFraction
 			local trackW = self.TrackBg.AbsoluteSize.X
 			self.TrackFill.Size = UDim2.new(f, 0, 1, 0)
-			self.Thumb.Position = UDim2.fromOffset(thumbRadius + f * trackW, SliderThumbDiameter / 2)
+			self.Thumb.Position = _udim2Offset(thumbRadius + f * trackW, SliderThumbDiameter / 2)
 
 			local disabled = self.Disabled
 			self.TitleLabel.TextTransparency = disabled and 0.5 or 0
@@ -6006,7 +6011,7 @@ return function(Toolkit, Veil)
 			Name = "NotchZone",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(thumbRadius, trackZoneTop + SliderThumbDiameter + 2),
+			Position = _udim2Offset(thumbRadius, trackZoneTop + SliderThumbDiameter + 2),
 			Size = UDim2.new(1, -SliderThumbDiameter, 0, 4),
 			ZIndex = 5,
 			Parent = slider.Holder,
@@ -6022,7 +6027,7 @@ return function(Toolkit, Veil)
 				BackgroundTransparency = 0.72,
 				BorderSizePixel = 0,
 				Position = UDim2.new(f, 0, 0, 0),
-				Size = UDim2.fromOffset(2, 4),
+				Size = _udim2Offset(2, 4),
 				ZIndex = 5,
 				Parent = notchZone,
 			})
@@ -6032,7 +6037,7 @@ return function(Toolkit, Veil)
 			local f = self.VisualFraction
 			local trackW = self.TrackBg.AbsoluteSize.X
 			self.TrackFill.Size = UDim2.new(f, 0, 1, 0)
-			self.Thumb.Position = UDim2.fromOffset(thumbRadius + f * trackW, SliderThumbDiameter / 2)
+			self.Thumb.Position = _udim2Offset(thumbRadius + f * trackW, SliderThumbDiameter / 2)
 
 			local disabled = self.Disabled
 			self.TitleLabel.TextTransparency = disabled and 0.5 or 0
@@ -6234,7 +6239,7 @@ return function(Toolkit, Veil)
 			Name = "TrackZone",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(0, trackZoneTop),
+			Position = _udim2Offset(0, trackZoneTop),
 			Size = UDim2.new(1, 0, 0, SliderThumbDiameter),
 			ZIndex = 5,
 			Parent = slider.Holder,
@@ -6244,7 +6249,7 @@ return function(Toolkit, Veil)
 			Name = "TrackBg",
 			BackgroundColor3 = COLORS.ToggleOffBackground,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(thumbRadius, trackInsetY),
+			Position = _udim2Offset(thumbRadius, trackInsetY),
 			Size = UDim2.new(1, -SliderThumbDiameter, 0, SliderTrackHeight),
 			ZIndex = 5,
 			Parent = slider.TrackZone,
@@ -6266,8 +6271,8 @@ return function(Toolkit, Veil)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = COLORS.Accent,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(thumbRadius, SliderThumbDiameter / 2),
-			Size = UDim2.fromOffset(SliderThumbDiameter, SliderThumbDiameter),
+			Position = _udim2Offset(thumbRadius, SliderThumbDiameter / 2),
+			Size = _udim2Offset(SliderThumbDiameter, SliderThumbDiameter),
 			ZIndex = 7,
 			Parent = slider.TrackZone,
 		})
@@ -6278,8 +6283,8 @@ return function(Toolkit, Veil)
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			BackgroundColor3 = COLORS.Accent,
 			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(thumbRadius, SliderThumbDiameter / 2),
-			Size = UDim2.fromOffset(SliderThumbDiameter, SliderThumbDiameter),
+			Position = _udim2Offset(thumbRadius, SliderThumbDiameter / 2),
+			Size = _udim2Offset(SliderThumbDiameter, SliderThumbDiameter),
 			ZIndex = 7,
 			Parent = slider.TrackZone,
 		})
@@ -6290,7 +6295,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(SliderThumbDiameter + 8, SliderThumbDiameter),
+			Size = _udim2Offset(SliderThumbDiameter + 8, SliderThumbDiameter),
 			Text = "",
 			ZIndex = 8,
 			Parent = slider.TrackZone,
@@ -6301,7 +6306,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(SliderThumbDiameter + 8, SliderThumbDiameter),
+			Size = _udim2Offset(SliderThumbDiameter + 8, SliderThumbDiameter),
 			Text = "",
 			ZIndex = 8,
 			Parent = slider.TrackZone,
@@ -6313,7 +6318,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = "",
 			ZIndex = 6,
 			Parent = slider.TrackZone,
@@ -6333,12 +6338,12 @@ return function(Toolkit, Veil)
 			local loCenterX = thumbRadius + lo * trackW
 			local hiCenterX = thumbRadius + hi * trackW
 
-			self.LowThumb.Position = UDim2.fromOffset(loCenterX, SliderThumbDiameter / 2)
-			self.HighThumb.Position = UDim2.fromOffset(hiCenterX, SliderThumbDiameter / 2)
+			self.LowThumb.Position = _udim2Offset(loCenterX, SliderThumbDiameter / 2)
+			self.HighThumb.Position = _udim2Offset(hiCenterX, SliderThumbDiameter / 2)
 
 			-- Thumb hitbox positions (centered on thumbs, with extra grab zone)
-			self.LowHitbox.Position = UDim2.fromOffset(loCenterX - (SliderThumbDiameter / 2 + 4), 0)
-			self.HighHitbox.Position = UDim2.fromOffset(hiCenterX - (SliderThumbDiameter / 2 + 4), 0)
+			self.LowHitbox.Position = _udim2Offset(loCenterX - (SliderThumbDiameter / 2 + 4), 0)
+			self.HighHitbox.Position = _udim2Offset(hiCenterX - (SliderThumbDiameter / 2 + 4), 0)
 
 			-- Range fill: from lo to hi fraction within TrackBg
 			self.RangeFill.Position = UDim2.new(lo, 0, 0, 0)
@@ -6778,7 +6783,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			ClipsDescendants = false,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			ZIndex = 240,
 			Parent = self.Surface,
 		})
@@ -6788,7 +6793,7 @@ return function(Toolkit, Veil)
 			AutoButtonColor = false,
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			Text = "",
 			Visible = false,
 			ZIndex = 242,
@@ -6869,11 +6874,11 @@ return function(Toolkit, Veil)
 			-- Freeze AutomaticSize so we can tween height to 0
 			local currentHeight = wrapper.AbsoluteSize.Y
 			wrapper.AutomaticSize = Enum.AutomaticSize.None
-			wrapper.Size = UDim2.fromOffset(wrapper.AbsoluteSize.X, currentHeight)
+			wrapper.Size = _udim2Offset(wrapper.AbsoluteSize.X, currentHeight)
 
 			local collapseTI = TweenInfo.new(OverlayCollapseTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 			local tween = TweenService:Create(wrapper, collapseTI, {
-				Size = UDim2.fromOffset(wrapper.AbsoluteSize.X, 0),
+				Size = _udim2Offset(wrapper.AbsoluteSize.X, 0),
 			})
 			tween:Play()
 			tween.Completed:Connect(function()
@@ -6916,7 +6921,7 @@ return function(Toolkit, Veil)
 		self._overlayOrder = self._overlayOrder + 1
 
 		local wrapper, card = createOverlayCard(host, config.Width, self._overlayOrder, 210)
-		card.Position = UDim2.fromOffset(config.EnterOffset.X, config.EnterOffset.Y)
+		card.Position = _udim2Offset(config.EnterOffset.X, config.EnterOffset.Y)
 
 		if kind == "Toast" then
 			buildToastCard(card, accentColor, options, 210)
@@ -6942,7 +6947,7 @@ return function(Toolkit, Veil)
 				return
 			end
 
-			animateOverlayCard(entry.Card, Vector2.zero, true)
+			animateOverlayCard(entry.Card, _v2zero, true)
 		end)
 
 		task.delay(math.max(0.5, tonumber(options.Duration) or (kind == "Toast" and 3.5 or 5)), function()
@@ -7048,7 +7053,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Interactable = false,
-			Size = UDim2.fromScale(1, 1),
+			Size = _udim2Scale(1, 1),
 			ZIndex = 150,
 			Parent = self.Surface,
 		})
@@ -7060,8 +7065,8 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Interactable = false,
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(100, 100),
+			Position = _udim2Scale(0.5, 0.5),
+			Size = _udim2Offset(100, 100),
 			ZIndex = 151,
 			Parent = surface,
 		})
@@ -7100,8 +7105,8 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Interactable = false,
-			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(state.DotSize, state.DotSize),
+			Position = _udim2Scale(0.5, 0.5),
+			Size = _udim2Offset(state.DotSize, state.DotSize),
 			ZIndex = 153,
 			Parent = container,
 		})
@@ -7114,35 +7119,35 @@ return function(Toolkit, Veil)
 			local cx, cy = 50, 50  -- center of 100x100 container
 
 			-- Top arm
-			aTop.Position = UDim2.fromOffset(cx, cy - g - l / 2)
-			aTop.Size = UDim2.fromOffset(w, l)
+			aTop.Position = _udim2Offset(cx, cy - g - l / 2)
+			aTop.Size = _udim2Offset(w, l)
 			-- Bottom arm
-			aBottom.Position = UDim2.fromOffset(cx, cy + g + l / 2)
-			aBottom.Size = UDim2.fromOffset(w, l)
+			aBottom.Position = _udim2Offset(cx, cy + g + l / 2)
+			aBottom.Size = _udim2Offset(w, l)
 			-- Left arm
-			aLeft.Position = UDim2.fromOffset(cx - g - l / 2, cy)
-			aLeft.Size = UDim2.fromOffset(l, w)
+			aLeft.Position = _udim2Offset(cx - g - l / 2, cy)
+			aLeft.Size = _udim2Offset(l, w)
 			-- Right arm
-			aRight.Position = UDim2.fromOffset(cx + g + l / 2, cy)
-			aRight.Size = UDim2.fromOffset(l, w)
+			aRight.Position = _udim2Offset(cx + g + l / 2, cy)
+			aRight.Size = _udim2Offset(l, w)
 
 			local outlineAlpha = state.OutlineEnabled and 0.72 or 1
 			local ow = w + 2
-			oTop.Position    = UDim2.fromOffset(cx, cy - g - l / 2)
-			oTop.Size        = UDim2.fromOffset(ow, l + 2)
-			oBottom.Position = UDim2.fromOffset(cx, cy + g + l / 2)
-			oBottom.Size     = UDim2.fromOffset(ow, l + 2)
-			oLeft.Position   = UDim2.fromOffset(cx - g - l / 2, cy)
-			oLeft.Size       = UDim2.fromOffset(l + 2, ow)
-			oRight.Position  = UDim2.fromOffset(cx + g + l / 2, cy)
-			oRight.Size      = UDim2.fromOffset(l + 2, ow)
+			oTop.Position    = _udim2Offset(cx, cy - g - l / 2)
+			oTop.Size        = _udim2Offset(ow, l + 2)
+			oBottom.Position = _udim2Offset(cx, cy + g + l / 2)
+			oBottom.Size     = _udim2Offset(ow, l + 2)
+			oLeft.Position   = _udim2Offset(cx - g - l / 2, cy)
+			oLeft.Size       = _udim2Offset(l + 2, ow)
+			oRight.Position  = _udim2Offset(cx + g + l / 2, cy)
+			oRight.Size      = _udim2Offset(l + 2, ow)
 
 			for _, arm in ipairs({oTop, oBottom, oLeft, oRight}) do
 				arm.BackgroundColor3 = state.OutlineColor
 				arm.BackgroundTransparency = outlineAlpha
 			end
 
-			dot.Size = UDim2.fromOffset(state.DotSize, state.DotSize)
+			dot.Size = _udim2Offset(state.DotSize, state.DotSize)
 			dot.BackgroundTransparency = state.DotEnabled and (1 - state.Opacity) or 1
 		end
 
@@ -7171,10 +7176,10 @@ return function(Toolkit, Veil)
 				pulseSize = pulseSize + pulseDelta * 20 * dt
 				if pulseSize >= 110 then pulseDelta = -1
 				elseif pulseSize <= 90 then pulseDelta = 1 end
-				container.Size = UDim2.fromOffset(pulseSize, pulseSize)
+				container.Size = _udim2Offset(pulseSize, pulseSize)
 			else
 				container.Rotation = 0
-				container.Size = UDim2.fromOffset(100, 100)
+				container.Size = _udim2Offset(100, 100)
 			end
 		end)
 
@@ -7250,7 +7255,7 @@ return function(Toolkit, Veil)
 				Min = 1, Max = 12, Default = state.DotSize, Step = 1,
 				Callback = function(v)
 					state.DotSize = v
-					dot.Size = UDim2.fromOffset(v, v)
+					dot.Size = _udim2Offset(v, v)
 					createCorner(dot, v / 2)
 				end,
 			})
@@ -7276,7 +7281,7 @@ return function(Toolkit, Veil)
 					state.Animation = v
 					if v == "None" then
 						container.Rotation = 0
-						container.Size = UDim2.fromOffset(100, 100)
+						container.Size = _udim2Offset(100, 100)
 					end
 				end,
 			})
@@ -7315,7 +7320,7 @@ return function(Toolkit, Veil)
 			BackgroundColor3 = COLORS.Window,
 			BackgroundTransparency = 0,
 			BorderSizePixel = 0,
-			Size = UDim2.fromOffset(CharViewerWidth, 300), -- height updated per frame
+			Size = _udim2Offset(CharViewerWidth, 300), -- height updated per frame
 			Visible = false,
 			ZIndex = 5,
 			Parent = self.Surface,
@@ -7330,8 +7335,8 @@ return function(Toolkit, Veil)
 			BorderSizePixel = 0,
 			LightColor = Color3.fromRGB(220, 220, 235),
 			LightDirection = Vector3.new(-1, -2, -1),
-			Position = UDim2.fromOffset(0, 0),
-			Size = UDim2.fromScale(1, 1),
+			Position = _udim2Offset(0, 0),
+			Size = _udim2Scale(1, 1),
 			ZIndex = 6,
 			Parent = panel,
 		})
@@ -7400,8 +7405,8 @@ return function(Toolkit, Veil)
 				local winSize = sourceWindow.Frame.AbsoluteSize
 				local screenH = sourceWindow.Frame.Parent and sourceWindow.Frame.Parent.AbsoluteSize.Y or 600
 				local panelH = winSize.Y
-				panel.Position = UDim2.fromOffset(winPos.X + winSize.X + CharViewerGap, winPos.Y)
-				panel.Size = UDim2.fromOffset(CharViewerWidth, panelH)
+				panel.Position = _udim2Offset(winPos.X + winSize.X + CharViewerGap, winPos.Y)
+				panel.Size = _udim2Offset(CharViewerWidth, panelH)
 			end
 
 			-- Spin character
@@ -7469,7 +7474,7 @@ return function(Toolkit, Veil)
 				or positionMode == "BottomLeft" and UDim2.new(0, 16, 1, -16)
 				or positionMode == "TopRight" and UDim2.new(1, -16, 0, 16)
 				or UDim2.new(0, 16, 0, 16),
-			Size = UDim2.fromOffset(panelWidth, panelHeight),
+			Size = _udim2Offset(panelWidth, panelHeight),
 			Visible = visible,
 			ZIndex = 190,
 			Parent = self.Surface,
@@ -7483,7 +7488,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Font = Enum.Font.GothamMedium,
-			Position = UDim2.fromOffset(padH, padV - 2),
+			Position = _udim2Offset(padH, padV - 2),
 			Size = UDim2.new(1, -padH * 2, 0, 16),
 			Text = options.Title or "Keybinds",
 			TextColor3 = COLORS.Text,
@@ -7502,7 +7507,7 @@ return function(Toolkit, Veil)
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
 				Font = Enum.Font.GothamMedium,
-				Position = UDim2.fromOffset(padH, y),
+				Position = _udim2Offset(padH, y),
 				Size = UDim2.new(0.65, -padH, 0, rowHeight),
 				Text = bind.Name or bind.Action or "Action",
 				TextColor3 = COLORS.Text,
@@ -7521,7 +7526,7 @@ return function(Toolkit, Veil)
 				BorderSizePixel = 0,
 				Font = Enum.Font.GothamMedium,
 				Position = UDim2.new(1, -padH, 0, y + rowHeight / 2),
-				Size = UDim2.fromOffset(0, 18),
+				Size = _udim2Offset(0, 18),
 				AutomaticSize = Enum.AutomaticSize.X,
 				Text = bind.Key or bind.KeyCode or "?",
 				TextColor3 = COLORS.Text,
@@ -7592,7 +7597,7 @@ return function(Toolkit, Veil)
 				Active = true,
 				BackgroundTransparency = 1,
 				BorderSizePixel = 0,
-				Size = UDim2.fromScale(1, 1),
+				Size = _udim2Scale(1, 1),
 				ZIndex = 300,
 				Parent = self.Surface,
 			})
@@ -7603,7 +7608,7 @@ return function(Toolkit, Veil)
 				BackgroundColor3 = Color3.new(0, 0, 0),
 				BackgroundTransparency = 0.5,
 				BorderSizePixel = 0,
-				Size = UDim2.fromScale(1, 1),
+				Size = _udim2Scale(1, 1),
 				Text = "",
 				ZIndex = 300,
 				Parent = self._searchSurface,
@@ -7634,8 +7639,8 @@ return function(Toolkit, Veil)
 			AnchorPoint = Vector2.new(0.5, 0.4),
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
-			Position = UDim2.fromScale(0.5, 0.4),
-			Size = UDim2.fromOffset(SearchModalWidth, SearchInputHeight + 8),
+			Position = _udim2Scale(0.5, 0.4),
+			Size = _udim2Offset(SearchModalWidth, SearchInputHeight + 8),
 			AutomaticSize = Enum.AutomaticSize.None,
 			ZIndex = 302,
 			Parent = self._searchSurface,
@@ -7660,7 +7665,7 @@ return function(Toolkit, Veil)
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
 			Position = UDim2.new(0, 14, 0.5, 0),
-			Size = UDim2.fromOffset(18, 18),
+			Size = _udim2Offset(18, 18),
 			ScaleType = Enum.ScaleType.Fit,
 			ImageColor3 = COLORS.Text,
 			ImageTransparency = 0.4,
@@ -7717,9 +7722,9 @@ return function(Toolkit, Veil)
 			Name = "Results",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			CanvasSize = UDim2.fromOffset(0, 0),
+			CanvasSize = _udim2Offset(0, 0),
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
-			Position = UDim2.fromOffset(0, SearchInputHeight + 1),
+			Position = _udim2Offset(0, SearchInputHeight + 1),
 			ScrollBarImageColor3 = COLORS.Accent,
 			ScrollBarThickness = 3,
 			Size = UDim2.new(1, 0, 0, 0),
@@ -7765,7 +7770,7 @@ return function(Toolkit, Veil)
 
 			local listH = math.min(#matched * SearchItemHeight + 12, SearchModalMaxHeight - SearchInputHeight)
 			resultsList.Size = UDim2.new(1, 0, 0, listH)
-			modal.Size = UDim2.fromOffset(SearchModalWidth, SearchInputHeight + (hasResults and (listH + 1) or 0))
+			modal.Size = _udim2Offset(SearchModalWidth, SearchInputHeight + (hasResults and (listH + 1) or 0))
 
 			for i, r in ipairs(matched) do
 				local row = Veil.Instance:Create("TextButton", {
@@ -7804,7 +7809,7 @@ return function(Toolkit, Veil)
 					BorderSizePixel = 0,
 					Font = Enum.Font.Gotham,
 					Position = UDim2.new(1, -8, 0.5, 0),
-					Size = UDim2.fromOffset(0, 18),
+					Size = _udim2Offset(0, 18),
 					AutomaticSize = Enum.AutomaticSize.X,
 					Text = r.type,
 					TextColor3 = COLORS.Accent,
