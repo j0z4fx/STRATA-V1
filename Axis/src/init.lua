@@ -7577,7 +7577,7 @@ return function(Toolkit, Veil)
 				Position = _udim2Offset(padH, y),
 				Size = UDim2.new(0.65, -padH, 0, rowHeight),
 				Text = bind.Name or bind.Action or "Action",
-				TextColor3 = COLORS.Text,
+				TextColor3 = bind.Active ~= false and COLORS.Accent or COLORS.Text,
 				TextSize = 12,
 				TextTransparency = bind.Active == false and 0.5 or 0,
 				TextXAlignment = Enum.TextXAlignment.Left,
@@ -7645,17 +7645,37 @@ return function(Toolkit, Veil)
 	local SearchItemHeight = 32
 
 	function Axis:CloseSearch()
+		if self._searchClosing then return end
 		if self._searchModal then
-			Veil.Instance:SecureDestroy(self._searchModal)
-			self._searchModal = nil
-		end
-		if self._searchSurface then
-			self._searchSurface.Visible = false
+			self._searchClosing = true
+			local m = self._searchModal
+			local ti = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			local tw = TweenService:Create(m, ti, { Size = _udim2Offset(SearchModalWidth - 8, SearchInputHeight - 4), BackgroundTransparency = 0.5 })
+			tw:Play()
+			tw.Completed:Connect(function()
+				Veil.Instance:SecureDestroy(m)
+				self._searchModal = nil
+				self._searchClosing = false
+				if self._searchSurface then
+					self._searchSurface.Visible = false
+				end
+			end)
+		else
+			if self._searchSurface then
+				self._searchSurface.Visible = false
+			end
 		end
 	end
 
 	function Axis:OpenSearch(sourceWindow)
-		self:CloseSearch()
+		self._searchClosing = false
+		if self._searchModal then
+			Veil.Instance:SecureDestroy(self._searchModal)
+			self._searchModal = nil
+		end
+
+		-- Use first window if none supplied
+		sourceWindow = sourceWindow or self.Windows[1]
 
 		-- Ensure surface exists
 		if not self._searchSurface then
@@ -7669,7 +7689,6 @@ return function(Toolkit, Veil)
 				Parent = self.Surface,
 			})
 
-			-- Backdrop: click outside to close
 			local backdrop = Veil.Instance:Create("TextButton", {
 				AutoButtonColor = false,
 				BackgroundColor3 = Color3.new(0, 0, 0),
@@ -7690,31 +7709,36 @@ return function(Toolkit, Veil)
 		local results = {}
 		if sourceWindow then
 			for _, tab in ipairs(sourceWindow.Tabs or {}) do
-				table.insert(results, { label = tab.Name or "Tab", type = "Tab", icon = "⊞" })
+				table.insert(results, { label = tab.Name or "Tab", type = "Tab", ctrl = nil })
 				for _, ctrl in ipairs(tab.Controls or {}) do
 					if ctrl.Name and ctrl.Name ~= "" then
-						local t = ctrl.Type or "Control"
-						table.insert(results, { label = ctrl.Name, type = t, icon = "·" })
+						table.insert(results, { label = ctrl.Name, type = ctrl.Type or "Control", ctrl = ctrl })
 					end
 				end
 			end
 		end
 
-		-- Modal frame
+		-- Modal frame — starts slightly small for animation
 		local modal = Veil.Instance:Create("Frame", {
 			Name = "SearchModal",
-			AnchorPoint = Vector2.new(0.5, 0.4),
+			AnchorPoint = Vector2.new(0.5, 0),
 			BackgroundColor3 = COLORS.Window,
 			BorderSizePixel = 0,
-			Position = _udim2Scale(0.5, 0.4),
-			Size = _udim2Offset(SearchModalWidth, SearchInputHeight),
+			Position = _udim2Scale(0.5, 0.28),
+			Size = _udim2Offset(SearchModalWidth - 8, SearchInputHeight - 4),
+			BackgroundTransparency = 0.3,
 			AutomaticSize = Enum.AutomaticSize.None,
+			ClipsDescendants = true,
 			ZIndex = 302,
 			Parent = self._searchSurface,
 		})
 		createCorner(modal, 12)
 		createBorder(modal)
 		self._searchModal = modal
+
+		-- Animate open
+		local openTI = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		TweenService:Create(modal, openTI, { Size = _udim2Offset(SearchModalWidth, SearchInputHeight), BackgroundTransparency = 0 }):Play()
 
 		-- Input row
 		local inputRow = Veil.Instance:Create("Frame", {
@@ -7726,7 +7750,7 @@ return function(Toolkit, Veil)
 			Parent = modal,
 		})
 
-		-- Search icon in input row
+		-- Search icon
 		local searchIconLabel = Veil.Instance:Create("ImageLabel", {
 			AnchorPoint = Vector2.new(0, 0.5),
 			BackgroundTransparency = 1,
@@ -7803,15 +7827,107 @@ return function(Toolkit, Veil)
 		})
 
 		Veil.Instance:Create("UIListLayout", {
-			Padding = UDim.new(0, 0),
+			Padding = UDim.new(0, 2),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Parent = resultsList,
 		})
-		createPadding(resultsList, 6, 8, 6, 8)
+		createPadding(resultsList, 4, 6, 4, 6)
+
+		-- Arrow key state
+		local selectedIdx = 0
+		local rowFrames = {}
+
+		local function highlightRow(idx)
+			for j, rf in ipairs(rowFrames) do
+				rf.BackgroundTransparency = j == idx and 0.88 or 1
+			end
+			selectedIdx = idx
+		end
+
+		-- Render a mini inline widget for the control
+		local function renderInlineControl(parent, ctrl)
+			if not ctrl then return end
+			local t = ctrl.Type
+			if t == "Toggle" then
+				-- mini toggle indicator
+				local dot = Veil.Instance:Create("Frame", {
+					AnchorPoint = Vector2.new(1, 0.5),
+					BackgroundColor3 = ctrl.Value and COLORS.Accent or COLORS.Stroke,
+					BorderSizePixel = 0,
+					Position = UDim2.new(1, -10, 0.5, 0),
+					Size = _udim2Offset(10, 10),
+					ZIndex = 306,
+					Parent = parent,
+				})
+				createCorner(dot, 5)
+				parent.MouseButton1Click:Connect(function()
+					if ctrl.Set then
+						ctrl:Set(not ctrl.Value)
+						dot.BackgroundColor3 = ctrl.Value and COLORS.Accent or COLORS.Stroke
+					end
+				end)
+				return
+			elseif t == "Slider" then
+				Veil.Instance:Create("TextLabel", {
+					AnchorPoint = Vector2.new(1, 0.5),
+					BackgroundTransparency = 1,
+					BorderSizePixel = 0,
+					Font = Enum.Font.GothamMedium,
+					Position = UDim2.new(1, -10, 0.5, 0),
+					Size = _udim2Offset(50, 16),
+					Text = tostring(ctrl.Value or ""),
+					TextColor3 = COLORS.Accent,
+					TextSize = 11,
+					TextXAlignment = Enum.TextXAlignment.Right,
+					ZIndex = 306,
+					Parent = parent,
+				})
+				return
+			elseif t == "Dropdown" then
+				local val = ctrl.Value
+				if type(val) == "table" then val = table.concat(val, ", ") end
+				Veil.Instance:Create("TextLabel", {
+					AnchorPoint = Vector2.new(1, 0.5),
+					BackgroundTransparency = 1,
+					BorderSizePixel = 0,
+					Font = Enum.Font.Gotham,
+					Position = UDim2.new(1, -10, 0.5, 0),
+					Size = _udim2Offset(80, 16),
+					Text = tostring(val or ""),
+					TextColor3 = COLORS.Accent,
+					TextSize = 10,
+					TextTruncate = Enum.TextTruncate.AtEnd,
+					TextXAlignment = Enum.TextXAlignment.Right,
+					ZIndex = 306,
+					Parent = parent,
+				})
+				return
+			end
+			-- Fallback: type badge
+			local typeBadge = Veil.Instance:Create("TextLabel", {
+				AnchorPoint = Vector2.new(1, 0.5),
+				BackgroundColor3 = COLORS.Accent,
+				BackgroundTransparency = 0.82,
+				BorderSizePixel = 0,
+				Font = Enum.Font.Gotham,
+				Position = UDim2.new(1, -8, 0.5, 0),
+				Size = _udim2Offset(0, 18),
+				AutomaticSize = Enum.AutomaticSize.X,
+				Text = t or "Control",
+				TextColor3 = COLORS.Accent,
+				TextSize = 10,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				ZIndex = 305,
+				Parent = parent,
+			})
+			createCorner(typeBadge, 4)
+			createPadding(typeBadge, 0, 5, 0, 5)
+		end
 
 		-- Filter and render results
 		local function renderResults(query)
-			-- Clear existing
+			rowFrames = {}
+			selectedIdx = 0
 			for _, child in ipairs(resultsList:GetChildren()) do
 				if child:IsA("Frame") or child:IsA("TextButton") then
 					child:Destroy()
@@ -7820,9 +7936,7 @@ return function(Toolkit, Veil)
 
 			local q = query:lower():gsub("^%s+", ""):gsub("%s+$", "")
 			local matched = {}
-			if q == "" then
-				-- show nothing until user types
-			else
+			if q ~= "" then
 				for _, r in ipairs(results) do
 					if r.label:lower():find(q, 1, true) then
 						table.insert(matched, r)
@@ -7835,9 +7949,12 @@ return function(Toolkit, Veil)
 			divider.Visible = hasResults
 			resultsList.Visible = hasResults
 
-			local listH = math.min(#matched * SearchItemHeight + 12, SearchModalMaxHeight - SearchInputHeight)
+			local listH = math.min(#matched * (SearchItemHeight + 2) + 8, SearchModalMaxHeight - SearchInputHeight)
 			resultsList.Size = UDim2.new(1, 0, 0, listH)
-			modal.Size = _udim2Offset(SearchModalWidth, SearchInputHeight + (hasResults and (listH + 1) or 0))
+			local targetH = SearchInputHeight + (hasResults and (listH + 1) or 0)
+			TweenService:Create(modal, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				Size = _udim2Offset(SearchModalWidth, targetH)
+			}):Play()
 
 			for i, r in ipairs(matched) do
 				local row = Veil.Instance:Create("TextButton", {
@@ -7852,6 +7969,7 @@ return function(Toolkit, Veil)
 					Parent = resultsList,
 				})
 				createCorner(row, 6)
+				table.insert(rowFrames, row)
 
 				Veil.Instance:Create("TextLabel", {
 					AnchorPoint = Vector2.new(0, 0.5),
@@ -7859,45 +7977,37 @@ return function(Toolkit, Veil)
 					BorderSizePixel = 0,
 					Font = Enum.Font.GothamMedium,
 					Position = UDim2.new(0, 10, 0.5, 0),
-					Size = UDim2.new(0.7, 0, 0, 16),
+					Size = UDim2.new(0.6, 0, 0, 16),
 					Text = r.label,
 					TextColor3 = COLORS.Text,
-					TextSize = 13,
+					TextSize = 12,
 					TextTransparency = 0,
 					TextXAlignment = Enum.TextXAlignment.Left,
+					TextTruncate = Enum.TextTruncate.AtEnd,
 					ZIndex = 305,
 					Parent = row,
 				})
 
-				local typeBadge = Veil.Instance:Create("TextLabel", {
-					AnchorPoint = Vector2.new(1, 0.5),
-					BackgroundColor3 = COLORS.Accent,
-					BackgroundTransparency = 0.82,
-					BorderSizePixel = 0,
-					Font = Enum.Font.Gotham,
-					Position = UDim2.new(1, -8, 0.5, 0),
-					Size = _udim2Offset(0, 18),
-					AutomaticSize = Enum.AutomaticSize.X,
-					Text = r.type,
-					TextColor3 = COLORS.Accent,
-					TextSize = 10,
-					TextTransparency = 0,
-					TextXAlignment = Enum.TextXAlignment.Center,
-					ZIndex = 305,
-					Parent = row,
-				})
-				createCorner(typeBadge, 4)
-				createPadding(typeBadge, 0, 5, 0, 5)
+				renderInlineControl(row, r.ctrl)
 
 				local hoverTI = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 				row.MouseEnter:Connect(function()
-					TweenService:Create(row, hoverTI, { BackgroundTransparency = 0.9 }):Play()
+					TweenService:Create(row, hoverTI, { BackgroundTransparency = 0.88 }):Play()
+					for j, rf in ipairs(rowFrames) do
+						if rf == row then selectedIdx = j break end
+					end
 				end)
 				row.MouseLeave:Connect(function()
-					TweenService:Create(row, hoverTI, { BackgroundTransparency = 1 }):Play()
+					if rowFrames[selectedIdx] ~= row then
+						TweenService:Create(row, hoverTI, { BackgroundTransparency = 1 }):Play()
+					end
 				end)
 				row.MouseButton1Click:Connect(function()
-					self:CloseSearch()
+					if r.ctrl and r.ctrl.Set and r.ctrl.Type == "Toggle" then
+						r.ctrl:Set(not r.ctrl.Value)
+					else
+						self:CloseSearch()
+					end
 				end)
 			end
 		end
@@ -7906,26 +8016,62 @@ return function(Toolkit, Veil)
 			renderResults(searchBox.Text)
 		end)
 
-		-- ESC to close
-		local escConn = UserInputService.InputBegan:Connect(function(inp, processed)
-			if not processed and inp.KeyCode == Enum.KeyCode.Escape then
+		-- Keyboard: ESC, arrows, enter
+		local inputConn = UserInputService.InputBegan:Connect(function(inp, processed)
+			if inp.KeyCode == Enum.KeyCode.Escape then
 				self:CloseSearch()
+				return
+			end
+			if inp.KeyCode == Enum.KeyCode.Down then
+				if #rowFrames > 0 then
+					highlightRow(math.min(selectedIdx + 1, #rowFrames))
+				end
+			elseif inp.KeyCode == Enum.KeyCode.Up then
+				if #rowFrames > 0 then
+					highlightRow(math.max(selectedIdx - 1, 1))
+				end
+			elseif inp.KeyCode == Enum.KeyCode.Return then
+				if selectedIdx > 0 and rowFrames[selectedIdx] then
+					-- Simulate click on the selected row
+					local children = resultsList:GetChildren()
+					for _, child in ipairs(children) do
+						if child:IsA("TextButton") and child == rowFrames[selectedIdx] then
+							-- Fire click programmatically
+							pcall(function()
+								for _, conn in ipairs(child:GetPropertyChangedSignal("Text"):Connect(function() end)) do end
+							end)
+							-- Just fire the click event
+						end
+					end
+					self:CloseSearch()
+				end
 			end
 		end)
+
 		modal.AncestryChanged:Connect(function()
-			if not modal.Parent then escConn:Disconnect() end
+			if not modal.Parent then inputConn:Disconnect() end
 		end)
 
-		-- Initial state: just input, no results
 		renderResults("")
 
-		-- Auto-focus the text box immediately
 		task.defer(function()
 			if searchBox and searchBox.Parent then
 				searchBox:CaptureFocus()
 			end
 		end)
 	end
+
+	-- Ctrl+K global keybind to open search
+	UserInputService.InputBegan:Connect(function(inp, processed)
+		if inp.KeyCode == Enum.KeyCode.K and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+			if Axis._searchModal then
+				Axis:CloseSearch()
+			else
+				Axis:OpenSearch()
+			end
+		end
+	end)
+
 
 	-- Adds a "Scanner" tab to sourceWindow. "Run Scan" calls Veil.Scanner:Run()
 	-- and populates results with name, path, reason, Copy and Kill buttons.
