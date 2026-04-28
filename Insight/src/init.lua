@@ -1,8 +1,10 @@
--- Insight — ESP module for STRATA-V1
+-- Insight — player ESP module for STRATA-V1
+-- Depends on: Toolkit, Veil (both passed as arguments to this factory).
 -- Loadable via: loadstring(game:HttpGet(url))()(Toolkit, Veil)
--- Architecture mirrors MSESP: per-entity ESP objects updated on Heartbeat.
--- All instance creation goes through Veil.Instance:Create.
+-- Public: Enable(), Disable(), Configure(options)
+-- All rendering goes through Veil.GUI:CreateSurface — no direct Instance.new.
 -- All service access goes through Veil.Services:Get.
+-- Architecture: per-player ESP objects with Update/Remove methods updated on Heartbeat.
 return function(Toolkit, Veil)
 	assert(type(Veil) == "table", "[Insight] Veil dependency required")
 	assert(type(Veil.Instance) == "table", "[Insight] Veil.Instance required")
@@ -34,9 +36,11 @@ return function(Toolkit, Veil)
 		RemovedConn = nil,
 	}
 
+	-- AABB half-extents used for 8-corner screen projection. Tuned for R6 rigs;
+	-- adjust HALF_H for taller/shorter characters or different rig types.
 	local HALF_H = 3.0   -- HumanoidRootPart → top of head (R6)
 	local HALF_W = 1.0   -- HRP → left/right
-	local HALF_D = 0.6   -- HRP → front/back (thin for box fit)
+	local HALF_D = 0.6   -- HRP → front/back (kept narrow for tighter box fit)
 	local NAME_Y_OFFSET = -18
 	local DIST_Y_OFFSET = 4
 
@@ -226,6 +230,8 @@ return function(Toolkit, Veil)
 	local Insight = {}
 	Insight.__index = Insight
 
+	-- Creates the ESP overlay surface, tracks all current/future players, and
+	-- starts the Heartbeat update loop. No-op if already active.
 	function Insight:Enable()
 		if _state.Active then return end
 		_state.Active = true
@@ -241,6 +247,8 @@ return function(Toolkit, Veil)
 		_state.HBConn      = RunService.Heartbeat:Connect(updateAll)
 	end
 
+	-- Disconnects all connections, removes all ESP objects, and destroys the
+	-- overlay surface. No-op if not currently active.
 	function Insight:Disable()
 		if not _state.Active then return end
 		_state.Active = false
@@ -259,7 +267,10 @@ return function(Toolkit, Veil)
 		end
 	end
 
-	-- Applies config overrides and propagates color changes to live ESP objects.
+	-- Applies config overrides and propagates color/transparency changes to live objects.
+	-- Unknown keys are silently ignored. MaxDistance=0 disables distance culling.
+	-- options: {ShowBox?, ShowName?, ShowDistance?, BoxColor?, BoxTransparency?,
+	--           NameColor?, DistanceColor?, MaxDistance?, LineThickness?}
 	function Insight:Configure(options)
 		if type(options) ~= "table" then return end
 		for k, v in pairs(options) do

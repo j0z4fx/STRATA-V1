@@ -1,3 +1,11 @@
+-- Axis — UI construction module for STRATA-V1
+-- Depends on: Toolkit, Veil (both passed as arguments to this factory).
+-- Public: CreateWindow, CreateTab, Toast, Notify, DestroyAll,
+--         CreateCrosshair, CreateCharacterViewer, CreateKeybindOverlay,
+--         CreateScanner, SetAntiAFK, Get/SetTheme, Get/SetIconPack
+-- Never parents directly to CoreGui/PlayerGui/gethui — all surfaces via Veil.
+-- Executor compat: polyfills table.find/clear/clone and UDim2.fromOffset/Scale.
+
 return function(Toolkit, Veil)
 	assert(type(Toolkit) == "table", "[Axis] Toolkit dependency is required")
 	assert(type(Veil) == "table", "[Axis] Veil dependency is required")
@@ -2206,6 +2214,10 @@ return function(Toolkit, Veil)
 		local columnMode = options.ColumnMode or (tab.IsSettings and "Triple" or "Triple")
 		tab.leftColumn, tab.middleColumn, tab.rightColumn = createColumns(self, tab, tab.Content, columnMode)
 
+		-- Column API — all methods accept an options table and return a control object.
+		-- Common options across all controls:
+		--   Name (string), Subtext (string), Default (initial value), Callback (fn)
+		-- Control objects expose :Set(value) and :GetValue() unless noted otherwise.
 		local function makeColumnApi(frame)
 			return {
 				Frame = frame,
@@ -3483,6 +3495,9 @@ return function(Toolkit, Veil)
 		return colorpicker
 	end
 
+	-- Toggle — on/off switch with optional tooltip accessory.
+	-- options: {Name, Subtext?, Default (bool), Callback(bool)?, Persist?}
+	-- Returned control: :Set(bool), :GetValue()→bool
 	function Window:_createToggle(tab, options)
 		options = options or {}
 		local shouldPersist = options.Persist ~= false
@@ -3956,6 +3971,10 @@ return function(Toolkit, Veil)
 
 	-- ── Dropdown ─────────────────────────────────────────────────────────────
 
+	-- Dropdown — single or multi-select with optional search filter.
+	-- options: {Name, Items (string[]), Default (string|string[]), MultiSelect?,
+	--           Searchable?, Callback(value|values)?}
+	-- Multi Default must be a table; Callback receives string[] when MultiSelect=true.
 	function Window:_createDropdown(tab, options)
 		options = options or {}
 		local shouldPersist = options.Persist ~= false
@@ -4487,7 +4506,12 @@ return function(Toolkit, Veil)
 		return dropdown
 	end
 
-	-- ── Input Field ──────────────────────────────────────────────────────────
+	-- ── Input / SecureInput ───────────────────────────────────────────────────
+	-- Input: options: {Name, Placeholder?, Default?, MaxLength?, Validator(v)→bool?,
+	--                  Callback(value)?}
+	-- Validator receives the raw string; red stroke shown on false, no callback fired.
+	-- SecureInput: same API but TextBox.Text is always masked as bullets (•).
+	-- Real value is stored internally and passed unmasked to Callback.
 
 	function Window:_createInput(tab, options)
 		options = options or {}
@@ -4891,6 +4915,8 @@ return function(Toolkit, Veil)
 	end
 
 	-- ── Button ───────────────────────────────────────────────────────────────
+	-- options: {Name, Style ("primary"|"secondary"), Callback()?}
+	-- Primary uses accent fill; secondary uses muted background.
 
 	function Window:_createButton(tab, options)
 		options = options or {}
@@ -5019,6 +5045,8 @@ return function(Toolkit, Veil)
 	end
 
 	-- ── Checkbox ─────────────────────────────────────────────────────────────
+	-- Visually distinct from Toggle: square tick box, no switch. Separate control.
+	-- options: {Name, Subtext?, Default (bool), Callback(bool)?}
 
 	local CheckboxSize = 18
 	local CheckboxCorner = 4
@@ -5217,6 +5245,12 @@ return function(Toolkit, Veil)
 	end
 
 	-- ── Radio Button ─────────────────────────────────────────────────────────
+
+	-- ── Radio ────────────────────────────────────────────────────────────────
+	-- Single-select option group. Only one item active at a time.
+	-- options: {Name, Items (string[]), Default (string), Orientation ("Vertical"|"Horizontal"),
+	--           Callback(value)?}
+	-- Horizontal layout shares column width equally; long labels may clip.
 
 	local RadioDotSize = 8
 	local RadioCircleSize = 16
@@ -5485,6 +5519,9 @@ return function(Toolkit, Veil)
 		frame.Rotation = math.deg(math.atan2(dy, dx))
 	end
 
+	-- Bezier curve editor. Callback receives {CP1 (UDim2 0..1), CP2 (UDim2 0..1)}.
+	-- Canvas is fixed size; curve always passes through (0,0) and (1,1).
+	-- options: {Name, Callback(pts)?}
 	function Window:_createCurveEditor(tab, options)
 		options = options or {}
 
@@ -5749,6 +5786,9 @@ return function(Toolkit, Veil)
 	end
 
 	-- ── Normal Slider ────────────────────────────────────────────────────────
+	-- Continuous or stepped drag slider with live value display.
+	-- options: {Name, Subtext?, Min, Max, Default, Step, Callback(value)?}
+	-- Step=0 allows free float; Step>0 snaps to increments.
 
 	function Window:_createSlider(tab, options)
 		options = options or {}
@@ -5954,6 +5994,9 @@ return function(Toolkit, Veil)
 	end
 
 	-- ── Notched Slider ───────────────────────────────────────────────────────
+	-- Discrete slider showing notch marks for each step. Step must divide evenly
+	-- into (Max-Min) or the last notch will not align to Max.
+	-- options: {Name, Subtext?, Min, Max, Default, Step, Callback(value)?}
 
 	function Window:_createNotchedSlider(tab, options)
 		options = options or {}
@@ -6181,6 +6224,9 @@ return function(Toolkit, Veil)
 	end
 
 	-- ── Range Slider ─────────────────────────────────────────────────────────
+	-- Two-thumb slider for min/max range selection. Thumbs cannot cross each other.
+	-- options: {Name, Subtext?, Min, Max, DefaultMin, DefaultMax, Step,
+	--           Callback(minVal, maxVal)?}
 
 	function Window:_createRangeSlider(tab, options)
 		options = options or {}
@@ -6960,6 +7006,8 @@ return function(Toolkit, Veil)
 		return entry
 	end
 
+	-- Creates the main Axis window and sets it as Axis.ActiveWindow.
+	-- options: {Width?, Height?, Title?, Position?}
 	function Axis:CreateWindow(options)
 		local window = Window.new(options)
 		table.insert(self.Windows, window)
@@ -6967,19 +7015,27 @@ return function(Toolkit, Veil)
 		return window
 	end
 
+	-- Creates a tab on the active window. options.PinnedBottom=true docks it at
+	-- sidebar bottom. options.ShowCharacterViewer=true enables character viewer.
 	function Axis:CreateTab(options)
 		assert(self.ActiveWindow, "[Axis] Create a window before creating tabs")
 		return self.ActiveWindow:CreateTab(options)
 	end
 
+	-- Shows a short ephemeral toast at TopCenter/BottomCenter; auto-dismisses.
+	-- options: {Title, Message, Duration?, Location?}
 	function Axis:Toast(options)
 		return self:_createOverlay("Toast", options)
 	end
 
+	-- Shows a corner notification; auto-dismisses after Duration seconds.
+	-- options: {Title, Message, Duration?, Location?}
 	function Axis:Notify(options)
 		return self:_createOverlay("Notification", options)
 	end
 
+	-- Destroys all windows, overlays, pickers, and surfaces. Also stops anti-AFK
+	-- and closes the search modal. Call at script exit or Axis restart.
 	function Axis:DestroyAll()
 		if self.ActiveOverlays then
 			for id, entry in pairs(self.ActiveOverlays) do
@@ -7027,6 +7083,9 @@ return function(Toolkit, Veil)
 	end
 
 	-- ── Crosshair ────────────────────────────────────────────────────────────
+	-- Adds a "Crosshair" tab to sourceWindow with live-preview controls.
+	-- options: {Color?, Width?, Length?, Gap?, Opacity?, DotEnabled?, Animation?}
+	-- Animation: "None" | "Spin" | "Pulse"
 
 	function Axis:CreateCrosshair(sourceWindow, options)
 		options = options or {}
@@ -7302,10 +7361,13 @@ return function(Toolkit, Veil)
 	end
 
 	-- ── Character Viewer ─────────────────────────────────────────────────────
+	-- ViewportFrame panel showing a spinning R6 rig with local player appearance.
+	-- Visibility is controlled per-tab via tab.ShowCharacterViewer=true.
+	-- Panel repositions each Heartbeat to track the window's AbsolutePosition.
 
 	local CharViewerWidth = 180
 	local CharViewerGap = 12
-	local CharViewerSpinSpeed = 25  -- degrees per second
+	local CharViewerSpinSpeed = 25  -- degrees per second; adjust for visual feel
 
 	function Axis:CreateCharacterViewer(sourceWindow, options)
 		options = options or {}
@@ -7448,6 +7510,9 @@ return function(Toolkit, Veil)
 	end
 
 	-- ── Keybind Overlay ──────────────────────────────────────────────────────
+	-- Standalone reference panel independent of the main window visibility.
+	-- options: {Title?, Keybind (KeyCode), Position ("BottomRight"|etc), Binds[]}
+	-- Binds entry: {Name, Key (string label), Active (bool for highlight)}
 
 	function Axis:CreateKeybindOverlay(options)
 		options = options or {}
@@ -7861,6 +7926,9 @@ return function(Toolkit, Veil)
 		end)
 	end
 
+	-- Adds a "Scanner" tab to sourceWindow. "Run Scan" calls Veil.Scanner:Run()
+	-- and populates results with name, path, reason, Copy and Kill buttons.
+	-- Scanner logic lives in Veil — Axis only presents results.
 	function Axis:CreateScanner(sourceWindow)
 		assert(sourceWindow, "[Axis] CreateScanner requires a window")
 
@@ -8033,6 +8101,8 @@ return function(Toolkit, Veil)
 		})
 	end
 
+	-- Fires VirtualUser:CaptureController on Player.Idled to prevent idle kick.
+	-- No-ops if VirtualUser service is unavailable. Cleaned up by DestroyAll.
 	function Axis:SetAntiAFK(enabled)
 		if enabled then
 			if self._antiAFKConn then return end
@@ -8053,6 +8123,7 @@ return function(Toolkit, Veil)
 		end
 	end
 
+	-- Returns current theme as {Key = "#RRGGBB"} hex map for all THEME_KEYS.
 	function Axis:GetTheme()
 		local theme = {}
 		for _, key in ipairs(THEME_KEYS) do
@@ -8061,12 +8132,15 @@ return function(Toolkit, Veil)
 		return theme
 	end
 
+	-- Applies a theme table ({Key = Color3 | "#RRGGBB"}) to all live windows.
 	function Axis:SetTheme(theme)
 		for _, window in ipairs(self.Windows) do
 			window:ApplyTheme(theme)
 		end
 	end
 
+	-- Updates a single theme color key and refreshes all live windows immediately.
+	-- key must be one of the values returned by GetThemeKeys().
 	function Axis:SetThemeColor(key, value)
 		if COLORS[key] == nil then
 			return false
@@ -8080,14 +8154,18 @@ return function(Toolkit, Veil)
 		return true
 	end
 
+	-- Returns a copy of the valid theme key list (safe to iterate; doesn't expose internal).
 	function Axis:GetThemeKeys()
 		return table.clone(THEME_KEYS)
 	end
 
+	-- Switches icon pack and immediately re-renders all registered tab icons.
+	-- packName: "Lucide" | "Phosphor"
 	function Axis:SetIconPack(packName)
 		IconProvider:SetPack(packName)
 	end
 
+	-- Returns the name of the currently active icon pack.
 	function Axis:GetIconPack()
 		return IconProvider.ActivePack
 	end

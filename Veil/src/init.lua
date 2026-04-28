@@ -1,3 +1,10 @@
+-- Veil — protection and runtime authority for STRATA-V1
+-- Depends on: Toolkit (passed as first argument to this factory).
+-- Public: Services, Protection, Instance, GUI, Hooks, Env, Security,
+--         Sound, Scanner, Protect()
+-- All class metatables hardened at load time via newcclosure + setreadonly.
+-- Veil itself is mutation-locked after init; external writes throw an error.
+
 return function(Toolkit)
 	assert(type(Toolkit) == "table", "[Veil] Toolkit dependency is required")
 	assert(type(Toolkit.Util) == "table", "[Veil] Toolkit.Util is required")
@@ -28,6 +35,10 @@ return function(Toolkit)
 	function Config:Scope(scopeKey)
 		return configState:Scope(scopeKey)
 	end
+
+	-- ── ServiceIsolation ─────────────────────────────────────────────────────────
+	-- Wraps each service in cloneref to prevent anti-cheat detection via
+	-- reference comparison (anti-cheats may compare game:GetService("X") identity).
 
 	local ServiceIsolation = {}
 	ServiceIsolation.__index = ServiceIsolation
@@ -71,6 +82,10 @@ return function(Toolkit)
 		return service
 	end
 
+	-- ── Protection ───────────────────────────────────────────────────────────────
+	-- Resolves and calls protectgui (or syn.protect_gui) to hide ScreenGuis from
+	-- the game's LocalScript environment and anti-cheat enumeration.
+
 	local Protection = {}
 	Protection.__index = Protection
 
@@ -106,6 +121,11 @@ return function(Toolkit)
 
 		return pcall(handler, instance)
 	end
+
+	-- ── InstanceControl ───────────────────────────────────────────────────────────
+	-- Veil's Instance.new proxy. Randomises instance names to avoid enumeration.
+	-- _retireKey in Create() options destroys any existing sibling with that key —
+	-- prevents duplicate ScreenGuis on re-load.
 
 	local InstanceControl = {}
 	InstanceControl.__index = InstanceControl
@@ -232,6 +252,12 @@ return function(Toolkit)
 
 		self._instances:Destroy(instance)
 	end
+
+	-- ── GUI ───────────────────────────────────────────────────────────────────────
+	-- Overlay and surface manager. ResolveParent priority:
+	--   gethui → protectgui+CoreGui → bare CoreGui → PlayerGui
+	-- CreateRoot: permanent main window ScreenGui (call once per session).
+	-- CreateSurface: ephemeral overlay ScreenGui (destroy when feature disabled).
 
 	local GUI = {}
 	GUI.__index = GUI
@@ -395,6 +421,10 @@ return function(Toolkit)
 		return surface
 	end
 
+	-- ── Hooks ─────────────────────────────────────────────────────────────────────
+	-- Wraps hookfunction and hookmetamethod. Replacements are converted to C
+	-- closures via newcclosure so they cannot be inspected by getupvalues.
+
 	local Hooks = {}
 	Hooks.__index = Hooks
 
@@ -453,6 +483,10 @@ return function(Toolkit)
 
 		return original
 	end
+
+	-- ── Env ───────────────────────────────────────────────────────────────────────
+	-- Isolated execution environment. Execute() compiles + runs a source string
+	-- with injected globals, keeping loaded scripts out of the shared environment.
 
 	local Env = {}
 	Env.__index = Env
@@ -554,6 +588,10 @@ return function(Toolkit)
 
 		return result, environment
 	end
+
+	-- ── Security ──────────────────────────────────────────────────────────────────
+	-- Key validation and remote API loader. SetValidator registers a custom check;
+	-- LoadAPI fetches and executes a remote Lua module that may expose ValidateKey.
 
 	local Security = {}
 	Security.__index = Security
@@ -791,7 +829,8 @@ return function(Toolkit)
 		return setmetatable({}, Scanner)
 	end
 
-	-- Returns table of {Name, Path, Reason, ScriptRef} or (nil, errMsg) if APIs unavailable
+	-- Returns ({Name,Path,Reason,ScriptRef}[], nil) on success, or (nil, errMsg) when
+	-- neither getgc nor getscripts is available. Always check the first return value.
 	function Scanner:Run()
 		if type(getgc) ~= "function" and type(getscripts) ~= "function" then
 			return nil, "No scan APIs available (getgc / getscripts required)"

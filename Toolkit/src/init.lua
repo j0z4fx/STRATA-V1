@@ -1,4 +1,13 @@
+-- Toolkit — core infrastructure for STRATA-V1
+-- No dependencies. Instantiated once; all modules share the same global instance.
+-- Public namespaces: Util, Signal, Services, Connections, Instance, Tasks,
+--                    State, Drag, Sound, Storage
+-- All APIs degrade gracefully in environments that lack executor or Roblox APIs.
+
 local HttpService = game:GetService("HttpService")
+
+-- ── Util ─────────────────────────────────────────────────────────────────────
+-- Stateless helpers. No dependencies; safe to use anywhere.
 
 local Util = {}
 
@@ -85,6 +94,7 @@ function Util.RandomString(length)
 	return table.concat(characters)
 end
 
+-- Falls back to RandomString(16) when HttpService.GenerateGUID is unavailable.
 function Util.GenerateId(prefix)
 	prefix = prefix or "id"
 
@@ -95,6 +105,9 @@ function Util.GenerateId(prefix)
 
 	return string.format("%s_%s", prefix, Util.RandomString(16))
 end
+
+-- ── Services ─────────────────────────────────────────────────────────────────
+-- Cached game:GetService wrapper. Strict mode turns nil returns into errors.
 
 local Services = {}
 Services.__index = Services
@@ -107,10 +120,12 @@ function Services.new(options)
 	return self
 end
 
+-- When strict=true, Get() errors on missing services instead of returning nil.
 function Services:SetStrict(enabled)
 	self._strict = not not enabled
 end
 
+-- Returns the service or nil (errors in strict mode).
 function Services:Get(name)
 	if self._cache[name] then
 		return self._cache[name]
@@ -129,12 +144,16 @@ function Services:Get(name)
 	return nil
 end
 
+-- Like Get but asserts; use for services the caller cannot function without.
 function Services:Require(name)
 	local service = self:Get(name)
 	assert(service, string.format("[Toolkit.Services] Missing service '%s'", tostring(name)))
 
 	return service
 end
+
+-- ── Connections ───────────────────────────────────────────────────────────────
+-- Tracks RBXScriptConnections and custom Disconnect tables for bulk cleanup.
 
 local Connections = {}
 Connections.__index = Connections
@@ -183,6 +202,10 @@ function Connections:Cleanup()
 		self._connections[connection] = nil
 	end
 end
+
+-- ── InstanceManager ───────────────────────────────────────────────────────────
+-- Wraps Instance.new with optional lifecycle tracking. Pass `_skipTrack=true`
+-- in the properties table to create an instance without adding it to cleanup.
 
 local InstanceManager = {}
 InstanceManager.__index = InstanceManager
@@ -250,6 +273,10 @@ function InstanceManager:Cleanup()
 		self:Destroy(instance)
 	end
 end
+
+-- ── Tasks ─────────────────────────────────────────────────────────────────────
+-- Tracked task.spawn / task.delay wrappers. Errors are caught via xpcall.
+-- Threads auto-untrack on completion; call Cancel to stop early.
 
 local Tasks = {}
 Tasks.__index = Tasks
@@ -324,6 +351,10 @@ function Tasks:Cleanup()
 		self._threads[thread] = nil
 	end
 end
+
+-- ── State ─────────────────────────────────────────────────────────────────────
+-- Key-value store with optional namespaced scopes. State:Scope(key) returns a
+-- proxy that prefixes all operations under that key — avoids key collisions.
 
 local State = {}
 State.__index = State
@@ -407,6 +438,10 @@ end
 function Scope:Clear()
 	self._state._store[self._scopeKey] = {}
 end
+
+-- ── Signal ────────────────────────────────────────────────────────────────────
+-- Lua-side event emitter. Fire() dispatches each listener in its own task.spawn
+-- thread, so slow listeners don't block later ones.
 
 local Signal = {}
 Signal.__index = Signal
@@ -492,6 +527,10 @@ function Signal:Destroy()
 		connection:Disconnect()
 	end
 end
+
+-- ── Drag ──────────────────────────────────────────────────────────────────────
+-- Mouse/touch drag for GuiObjects. Mode="Smooth" lerps on RenderStepped;
+-- Mode="Instant" sets position directly. ClampToParent keeps object in bounds.
 
 local Drag = {}
 Drag.__index = Drag
@@ -656,6 +695,11 @@ function Drag:AttachSmooth(handle, target, options)
 
 	return self:Attach(handle, target, options)
 end
+
+-- ── Sound ─────────────────────────────────────────────────────────────────────
+-- Resolves and plays audio from rbxassetid, local file path, or HTTP URL.
+-- Resolve() tries: rbxassetid prefix → local file via getcustomasset →
+--   external HTTP download → FallbackAssetId option (in that order).
 
 local Sound = {}
 Sound.__index = Sound
@@ -1116,6 +1160,10 @@ function Sound:Cleanup()
 	self:StopAll()
 	Util.ClearTable(self._cache)
 end
+
+-- ── Storage ───────────────────────────────────────────────────────────────────
+-- Executor filesystem wrapper. Degrades silently when readfile/writefile are
+-- unavailable (e.g., Studio). rootFolder is created on disk at construction time.
 
 local Storage = {}
 Storage.__index = Storage
