@@ -1,10 +1,12 @@
 local TOOLKIT_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main/Toolkit/src/init.lua"
 local VEIL_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main/Veil/src/init.lua"
 local AXIS_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main/Axis/src/init.lua"
+local INSIGHT_URL = "https://raw.githubusercontent.com/j0z4fx/STRATA-V1/main/Insight/src/init.lua"
 
 local Toolkit = loadstring(game:HttpGet(TOOLKIT_URL))()
 local Veil = loadstring(game:HttpGet(VEIL_URL))()(Toolkit)
 local Axis = loadstring(game:HttpGet(AXIS_URL))()(Toolkit, Veil)
+local Insight = loadstring(game:HttpGet(INSIGHT_URL))()(Toolkit, Veil)
 
 local window = Axis:CreateWindow({})
 
@@ -37,6 +39,15 @@ settingsLeft:CreateToggle({
 	Default = false,
 	Callback = function(value)
 		Axis:SetAntiAFK(value)
+	end,
+})
+
+settingsLeft:CreateToggle({
+	Name = "Player ESP",
+	Subtext = "Show boxes and names",
+	Default = false,
+	Callback = function(value)
+		if value then Insight:Enable() else Insight:Disable() end
 	end,
 })
 

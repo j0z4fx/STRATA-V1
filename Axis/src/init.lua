@@ -1,4 +1,4 @@
-﻿return function(Toolkit, Veil)
+return function(Toolkit, Veil)
 	assert(type(Toolkit) == "table", "[Axis] Toolkit dependency is required")
 	assert(type(Veil) == "table", "[Axis] Veil dependency is required")
 	assert(type(Toolkit.Drag) == "table", "[Axis] Toolkit.Drag is required")
